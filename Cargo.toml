@@ -1,0 +1,25 @@
+[package]
+name = "blog_os"
+version = "0.1.0"
+authors = ["egergo"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[dependencies]
+# bootloader_precompiled = "0.2.0"
+multiboot2 = "0.7.1"
+spin = "0.4.6"
+
+[dependencies.lazy_static]
+version = "1.0"
+features = ["spin_no_std"]
+
+[package.metadata.bootimage]
+default-target = "x86_64-blog_os.json"
+
+[lib]
+crate-type = ["staticlib"]
