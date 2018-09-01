@@ -15,7 +15,7 @@ lazy_static! {
             let stack_end = stack_start + STACK_SIZE;
             stack_end
         };
-        println!("TSS: {:?}", tss.interrupt_stack_table);
+        // println!("TSS: {:?}", tss.interrupt_stack_table);
         tss
     };
 }

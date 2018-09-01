@@ -14,7 +14,7 @@ extern crate bitflags;
 
 #[macro_use]
 mod console;
-mod pages;
+// mod pages;
 pub mod gdt;
 mod apic;
 pub mod pit;
@@ -101,7 +101,7 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
         let mm = mbi.memory_map_tag().expect("Memory map not provided by GRUB");
         for memory_area in mm.memory_areas() {
             println!("Memory: {:016x} - {:016x} ({} bytes)", memory_area.start_address(), memory_area.end_address(), memory_area.size());
-            pages::init_first_page(memory_area.start_address() / 4096);
+            // pages::init_first_page(memory_area.start_address() / 4096);
         }
     }
 
@@ -126,6 +126,7 @@ extern "x86-interrupt" fn wtf_handler(stack_frame: &mut ExceptionStackFrame) {
     println!("EXCEPTION: WTF\n{:#?}", stack_frame);
 }
 
+#[allow(dead_code)]
 extern "x86-interrupt" fn wtf_handler_code(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
     println!("EXCEPTION: WTF {}\n{:#?}", _error_code, stack_frame);
 }

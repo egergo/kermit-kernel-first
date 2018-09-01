@@ -3,6 +3,7 @@ use x86_64::instructions::port::Port;
 use x86_64::structures::idt::ExceptionStackFrame;
 use spin::Mutex;
 
+#[allow(dead_code)]
 const IA32_APIC_BASE_MSR: u32 = 0x1B;
 
 const PORT_PIC_MASTER_COMMAND: u16 = 0x20;
@@ -14,7 +15,7 @@ static MASTER: Mutex<Pic> = Mutex::new(Pic::new(PORT_PIC_MASTER_COMMAND));
 static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(PORT_PIC_SLAVE_COMMAND));
 
 bitflags! {
-    struct Icw1: u8 {
+    pub struct Icw1: u8 {
         const NONE      = 0b0000_0000;
         const ICW4      = 0b0000_0001;
         const SINGLE    = 0b0000_0010;
@@ -195,10 +196,10 @@ interrupt!(pit, {
 interrupt!(keyboard, {
     handle_irq(1);
 
-    let mut port: Port<u8> = Port::new(0x60);
+    let port: Port<u8> = Port::new(0x60);
 
     unsafe {
-        let mut c: u8 = 0;
+        let mut c: u8;
         loop {
             c = port.read();
             if c != 0 {
