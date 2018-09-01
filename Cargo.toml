@@ -13,6 +13,8 @@ panic = "abort"
 # bootloader_precompiled = "0.2.0"
 multiboot2 = "0.7.1"
 spin = "0.4.6"
+x86_64 = "0.2.11"
+bitflags = "1.0.4"
 
 [dependencies.lazy_static]
 version = "1.0"
