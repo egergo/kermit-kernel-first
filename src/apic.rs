@@ -100,6 +100,16 @@ impl Pic {
     }
 }
 
+pub fn ack(irq: u8) {
+    assert!(irq < 16);
+
+    if irq < 8 {
+        MASTER.lock().mask_clear(irq);
+    } else {
+        SLAVE.lock().mask_clear(irq - 8);
+    }
+}
+
 // fn cpu_get_apic_base() -> u64 {
 //     let msr = Msr::new(IA32_APIC_BASE_MSR);
 //     msr.read();
@@ -129,6 +139,15 @@ pub fn init() {
 
     master.send_eoi();
     slave.send_eoi();
+
+    // let mut port: Port<u8> = Port::new(0x60);
+    // let mut portcmd: Port<u8> = Port::new(0x64);
+    // unsafe {
+    //     port.write(0xF0);
+    //     port.write(0x42);
+    //     port.write(0xF0);
+    //     port.write(0);
+    // }
 }
 
 fn iowait() {
@@ -167,7 +186,7 @@ interrupt!(pit, {
 
     unsafe {
         TIME += ::pit::NANOSEC_PER_TICK;
-        println!("Time: {}", TIME / 1_000_000);
+        // println!("Time: {}", TIME / 1_000_000);
     }
 
     MASTER.lock().send_eoi();
@@ -175,6 +194,24 @@ interrupt!(pit, {
 
 interrupt!(keyboard, {
     handle_irq(1);
+
+    let mut port: Port<u8> = Port::new(0x60);
+
+    unsafe {
+        let mut c: u8 = 0;
+        loop {
+            c = port.read();
+            if c != 0 {
+                break;
+            } else {
+                println!("Error: {:x}", c);
+            }
+        }
+
+        println!("Key: {:x}", c);
+    }
+
+    ack(1);
 });
 
 interrupt!(cascade, {
