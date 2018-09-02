@@ -18,6 +18,8 @@ KERNEL := target/kernel.bin
 
 ISO := target/blog_os.iso
 
+LIBPATH := -L../acpica/target -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/x86_64-linux-gnu
+
 
 .PHONY: build run debug iso
 
@@ -43,4 +45,4 @@ $(BOOTLOADER_OBJ_PATTERN): $(BOOTLOADER_SRC_PATTERN)
 	@nasm -felf64 $< -o $@
 
 $(KERNEL): $(LINKER_SCRIPT) $(BOOTLOADER_OBJ) $(LIBKERNEL)
-	@ld -static -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) $(LIBKERNEL)
+	@ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) --start-group $(LIBKERNEL) -lacpica -lgcc --end-group

@@ -1,7 +1,13 @@
+// bash -lc "DISPLAY=:0 make run"
+
+// ../glibc/configure CFLAGS="-O2 -mno-red-zone -msoft-float -mno-sse -m64" --prefix=/tempglibc
+
 #![feature(panic_handler)]
 #![feature(abi_x86_interrupt)]
 #![feature(lang_items)]
 #![feature(const_fn)]
+#![feature(const_raw_ptr_deref)]
+#![feature(extern_prelude)]
 #![no_std]
 
 #[macro_use]
@@ -18,6 +24,9 @@ mod console;
 pub mod gdt;
 mod apic;
 pub mod pit;
+pub mod acpi;
+pub mod acpica;
+pub mod multiboot;
 
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{ExceptionStackFrame, InterruptDescriptorTable};
@@ -64,6 +73,8 @@ lazy_static! {
         idt[PIC_BASE + 14].set_handler_fn(apic::ata1);
         idt[PIC_BASE + 15].set_handler_fn(apic::ata2);
 
+        idt[9].set_handler_fn(wtf_handler);
+
         idt
     };
 }
@@ -73,12 +84,21 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     println!("Kermit!");
     println!("");
 
+    println!("Reading multiboot2...");
+    multiboot::init(multiboot_information_address);
+
     println!("Setting up GDT...");
     gdt::init();
     println!("Setting up IDT...");
     IDT.load();
     // println!("int3...");
     // x86_64::instructions::int3();
+
+    println!("Setting up ACPI...");
+    acpi::init();
+
+    println!("Setting up ACPICA...");
+    acpica::init();
 
     println!("Setting up PIT...");
     pit::init();
@@ -97,7 +117,7 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
 
     println!("Detecting memory...");
     unsafe {
-        let mbi = multiboot2::load(multiboot_information_address);
+        let mbi = multiboot::get();
         let mm = mbi.memory_map_tag().expect("Memory map not provided by GRUB");
         for memory_area in mm.memory_areas() {
             println!("Memory: {:016x} - {:016x} ({} bytes)", memory_area.start_address(), memory_area.end_address(), memory_area.size());
@@ -124,6 +144,7 @@ pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionSt
 
 extern "x86-interrupt" fn wtf_handler(stack_frame: &mut ExceptionStackFrame) {
     println!("EXCEPTION: WTF\n{:#?}", stack_frame);
+    panic!();
 }
 
 #[allow(dead_code)]
