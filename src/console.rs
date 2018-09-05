@@ -75,6 +75,10 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
+extern "C" {
+    fn memcpy(dst: usize, src: usize, num: usize) -> usize;
+}
+
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
@@ -95,15 +99,31 @@ impl Writer {
                 self.column_position += 1;
             }
         }
+
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut plus0 = Port::<u8>::new(0x3F8);
+            let mut plus5 = Port::<u8>::new(0x3F8 + 5);
+
+            loop {
+                if plus5.read() & 0x20 != 0 {
+                    break;
+                }
+            }
+
+            plus0.write(byte);
+        }
     }
 
     fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col];
-                self.buffer.chars[row - 1][col] = character;
-            }
-        }
+        unsafe { memcpy(0xb8000, 0xb80A0, 0xF00); }
+        // for row in 1..BUFFER_HEIGHT {
+        //     for col in 0..BUFFER_WIDTH {
+        //         let character = self.buffer.chars[row][col];
+        //         self.buffer.chars[row - 1][col] = character;
+        //     }
+        // }
         self.clear_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }

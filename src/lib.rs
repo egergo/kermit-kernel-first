@@ -127,8 +127,15 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
 
     x86_64::instructions::interrupts::enable();
 
-
-    loop {}
+    let mut last_time = 0usize;
+    loop {
+        let current_time = ::apic::TIME.load(core::sync::atomic::Ordering::SeqCst);
+        if current_time / 1_000_000_000 != last_time / 1_000_000_000 {
+        // if current_time != last_time {
+            last_time = current_time;
+            println!("Time: {} {}", last_time / 1_000_000, ::pit::NANOSEC_PER_TICK);
+        }
+    }
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {

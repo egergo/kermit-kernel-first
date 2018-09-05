@@ -15,7 +15,7 @@ pub fn init() {
   println!("PIT Data: HZ={}, DIVISOR={}, NANOSEC_PER_TICK={}", HZ, DIVISOR, NANOSEC_PER_TICK);
 
   unsafe {
-      cmd.write(SELECT_CHAN0 | LOHI | 4);
+      cmd.write(SELECT_CHAN0 | LOHI | 6);
       ch0.write((DIVISOR & 0xFF) as u8);
       ch0.write((DIVISOR >> 8) as u8);
   }

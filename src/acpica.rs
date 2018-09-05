@@ -1,11 +1,12 @@
 use multiboot;
 use core::fmt;
+use core::str;
 use x86_64::instructions::port::Port;
 
 #[allow(non_camel_case_types)]
-type ACPI_SIZE = u64;
+type ACPI_SIZE = usize;
 #[allow(non_camel_case_types)]
-type ACPI_PHYSICAL_ADDRESS = u64;
+type ACPI_PHYSICAL_ADDRESS = usize;
 #[allow(non_camel_case_types)]
 type ACPI_STATUS = u32;
 #[allow(non_camel_case_types)]
@@ -16,8 +17,99 @@ type ACPI_THREAD_ID = u64;
 type ACPI_SEMAPHORE = usize;
 #[allow(non_camel_case_types)]
 type ACPI_SPINLOCK = usize;
+#[allow(non_camel_case_types)]
+type ACPI_OBJECT_TYPE = u32;
+#[allow(non_camel_case_types)]
+type ACPI_HANDLE = VOID_PTR;
+#[allow(non_camel_case_types)]
+type ACPI_BUFFER = AcpiBuffer;
 
+const ACPI_TYPE_ANY: ACPI_OBJECT_TYPE = 0x00;
+const ACPI_TYPE_INTEGER: ACPI_OBJECT_TYPE = 0x01;
+const ACPI_TYPE_STRING: ACPI_OBJECT_TYPE = 0x02;
+const ACPI_TYPE_BUFFER: ACPI_OBJECT_TYPE = 0x03;
+const ACPI_TYPE_PACKAGE: ACPI_OBJECT_TYPE = 0x04;
+const ACPI_TYPE_FIELD_UNIT: ACPI_OBJECT_TYPE = 0x05;
+const ACPI_TYPE_DEVICE: ACPI_OBJECT_TYPE = 0x06;
+const ACPI_TYPE_EVENT: ACPI_OBJECT_TYPE = 0x07;
+const ACPI_TYPE_METHOD: ACPI_OBJECT_TYPE = 0x08;
+const ACPI_TYPE_MUTEX: ACPI_OBJECT_TYPE = 0x09;
+const ACPI_TYPE_REGION: ACPI_OBJECT_TYPE = 0x0A;
+const ACPI_TYPE_POWER: ACPI_OBJECT_TYPE = 0x0B;
+const ACPI_TYPE_PROCESSOR: ACPI_OBJECT_TYPE = 0x0C;
+const ACPI_TYPE_THERMAL: ACPI_OBJECT_TYPE = 0x0D;
+const ACPI_TYPE_BUFFER_FIELD: ACPI_OBJECT_TYPE = 0x0E;
+const ACPI_TYPE_DDB_HANDLE: ACPI_OBJECT_TYPE = 0x0F;
+const ACPI_TYPE_DEBUG_OBJECT: ACPI_OBJECT_TYPE = 0x10;
 
+const ACPI_ROOT_OBJECT: ACPI_HANDLE = 0xFFFFFFFF_FFFFFFFFusize;
+
+const AE_OK: ACPI_STATUS = 0;
+
+#[derive(Copy, Clone, Debug)]
+#[repr(packed)]
+#[allow(non_camel_case_types)]
+struct AcpiBuffer {
+    Length: ACPI_SIZE,
+    Pointer: VOID_PTR
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(packed)]
+#[allow(non_camel_case_types)]
+struct ACPI_DEVICE_INFO {
+    InfoSize: u32,
+    Name: ::acpi::Signature4,
+    Type: ACPI_OBJECT_TYPE,
+    ParamCount: u8,
+    Valid: u8,
+    Flags: u8,
+    HighestDstates: [u8; 4],
+    LowestDstates: [u8; 5],
+    CurrentStatus: u32,
+    Address: u64,
+    HardwareId: ACPI_PNP_DEVICE_ID,
+    UniqueId: ACPI_PNP_DEVICE_ID,
+    SubsystemId: ACPI_PNP_DEVICE_ID,
+    CompatibleIdList: ACPI_PNP_DEVICE_ID_LIST
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(packed)]
+#[allow(non_camel_case_types)]
+struct ACPI_PNP_DEVICE_ID {
+    Length: u32,
+    Str: CString
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(packed)]
+#[allow(non_camel_case_types)]
+struct ACPI_PNP_DEVICE_ID_LIST {
+    Count: u32,
+    ListSize: u32,
+    Ids: [ACPI_PNP_DEVICE_ID; 1]
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(packed)]
+pub struct CString(*const u8);
+impl CString {
+    pub unsafe fn to_str(&self) -> &str {
+        let len = strlen(self.0);
+        let sl = core::slice::from_raw_parts(self.0, len);
+        str::from_utf8_unchecked(sl)
+    }
+}
+
+pub struct CStringBuffer(CString, [u8; 256]);
+impl CStringBuffer {
+    pub fn new() -> CStringBuffer {
+        let mut buf = [0u8; 256];
+        let cs = CString(&mut buf[0]);
+        CStringBuffer(cs, buf)
+    }
+}
 
 #[derive(Copy, Clone)]
 struct CStringPrinter(usize);
@@ -60,6 +152,14 @@ extern "C" {
 
     fn AcpiEnableEvent(Event: u32, Flags: u32) -> ACPI_STATUS;
     fn AcpiInstallFixedEventHandler(Event: u32, Handler: VOID_PTR, Context: VOID_PTR) -> ACPI_STATUS;
+
+    fn AcpiWalkNamespace(Type: ACPI_OBJECT_TYPE, StartObject: ACPI_HANDLE, MaxDepth: u32, DescendingCallback: usize, AscendingCallback: usize, UserContext: VOID_PTR, ReturnValue: &mut VOID_PTR) -> ACPI_STATUS;
+    fn AcpiGetName(Object: ACPI_HANDLE, NameType: u32, OutName: &mut ACPI_BUFFER) -> ACPI_STATUS;
+    fn AcpiGetHandle(Parent: ACPI_HANDLE, Pathname: *const u8, OutHandle: &mut ACPI_HANDLE) -> ACPI_STATUS;
+    fn AcpiGetObjectInfo(Object: ACPI_HANDLE, OutBuffer: &mut&ACPI_DEVICE_INFO) -> ACPI_STATUS;
+    fn AcpiEvaluateObject(Object: ACPI_HANDLE, Pathname: *const u8, MethodParams: *const u8, ReturnBuffer: &ACPI_BUFFER) -> ACPI_STATUS;
+
+    fn strlen(data: *const u8) -> usize;
 }
 
 
@@ -100,7 +200,133 @@ pub fn init() {
         println!("AcpiInstallFixedEventHandler: 2 - {:x}", res);
         res = AcpiEnableEvent(2, 0);
         println!("AcpiEnableEvent: 2 - {:x}", res);
+
+        // ACPI_TYPE_DEVICE
+        res = AcpiWalkNamespace(ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, 0xFFFFFFFF, walk_callback as usize, walk_callback2 as usize, 0, &mut*(0 as *mut VOID_PTR));
+        println!("AcpiWalkNamespace: {:x}", res);
+
+        // \_SB_.PCI0._HID
+        let handle = get_handle(None, "\\_SB_.PCI0").expect("this should be good");
+        let res = evaluate_object(Some(handle), "_UID").expect("hid");
+        println!("res: {:?}", res);
+        // let res = evaluate_object(None, "\\_SB_.PCI0").expect("hid");
+        // println!("res: {:?}", res);
+        // let handle = get_handle(None, "\\_SB_.PCI0._HID").expect("this should be good");
+        // let res = get_object_info(handle).expect("all good");
+        // println!("res: {:?}", res);
     }
+}
+
+#[repr(packed)]
+struct CStr([u8; 256]);
+impl CStr {
+    fn new(s: &str) -> Self {
+        let mut c_str = [0u8; 256];
+        let len = s.len();
+        c_str[..len].clone_from_slice(s.as_bytes());
+        c_str[len] = 0;
+        CStr(c_str)
+    }
+
+    fn as_ptr(&self) -> *const u8 {
+        &self.0[0] as *const u8
+    }
+}
+
+fn get_handle(parent: Option<ACPI_HANDLE>, path: &str) -> Result<ACPI_HANDLE, ACPI_STATUS> {
+    let parent_acpi = match parent {
+        Some(x) => x,
+        None => 0
+    };
+    let mut out: ACPI_HANDLE = 0;
+    let res = unsafe { AcpiGetHandle(parent_acpi, CStr::new(path).as_ptr(), &mut out) };
+
+    match res {
+        0 => Ok(out),
+        x => Err(res)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(packed)]
+struct AcpiStrObject {
+    ttype: u32,
+    value: u64
+    // length: u32,
+    // ptr: *const u8
+}
+
+// https://github.com/spotify/linux/blob/master/drivers/acpi/acpica/exutils.c
+
+fn evaluate_object(parent: Option<ACPI_HANDLE>, path: &str) -> Result<ACPI_BUFFER, ACPI_STATUS> {
+    let parent_acpi = match parent {
+        Some(x) => x,
+        None => 0
+    };
+
+    let mut out = ACPI_BUFFER {
+        Length: 0xFFFFFFFF_FFFFFFFFusize,
+        Pointer: 0
+    };
+    let res = unsafe { AcpiEvaluateObject(parent_acpi, CStr::new(path).as_ptr(), 0 as *const u8, &mut out) };
+
+    unsafe {
+        let asdf = &*(out.Pointer as *const AcpiStrObject);
+        // let sss = CString(asdf.ptr);
+        // println!("!!!!! {:?} {:x}", out, out.Pointer);
+        // println!("!!!!! {:?}", asdf);
+        // println!("!!!!! {}", sss.to_str());
+        println!("!!!!! {:?}", asdf);
+    }
+
+    match res {
+        0 => Ok(out),
+        x => Err(res)
+    }
+}
+
+#[derive(Debug)]
+struct OwnedDeviceInfo(&'static ACPI_DEVICE_INFO);
+impl Drop for OwnedDeviceInfo {
+    fn drop(&mut self) {
+        unsafe {
+            AcpiOsFree(self.0 as *const _ as usize);
+        }
+    }
+}
+
+fn get_object_info(handle: ACPI_HANDLE) -> Result<OwnedDeviceInfo, ACPI_STATUS> {
+    let mut info: &ACPI_DEVICE_INFO = unsafe { &*(0 as *mut _) };
+    let res = unsafe { AcpiGetObjectInfo(handle, &mut info) };
+    match res {
+        0 => Ok(OwnedDeviceInfo(info)),
+        x => Err(res)
+    }
+}
+
+extern "C" fn walk_callback(ObjHandle: ACPI_HANDLE, Level: u32, Context: VOID_PTR) -> VOID_PTR {
+    if Level != 1 && false {
+        return 0
+    }
+
+    unsafe {
+        let mut buf = [0u8; 256];
+        let mut buffer = AcpiBuffer {
+            Length: 256,
+            Pointer: &mut buf as *mut _ as usize
+        };
+
+        AcpiGetName(ObjHandle, 0, &mut buffer);
+        let name = str::from_utf8_unchecked(&buf[..strlen(&buf[0])]);
+
+        let info = get_object_info(ObjHandle).expect("cannot get object info");
+        println!("Walk: {:x} {} {} {}", ObjHandle, Level, name, info.0.Type);
+        0
+    }
+}
+
+extern "C" fn walk_callback2(ObjHandle: ACPI_HANDLE, Level: u32, Context: VOID_PTR) -> VOID_PTR {
+    0
 }
 
 fn handler() -> u32 {
@@ -116,7 +342,7 @@ pub extern "C" fn AcpiOsPrintf() {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn AcpiOsAllocate(Size: ACPI_SIZE) -> VOID_PTR {
-    let result = malloc(Size);
+    let result = malloc(Size as u64);
     // println!("AcpiOsAllocate({}) -> {:x}", Size, result);
     result
 }

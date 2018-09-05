@@ -24,7 +24,7 @@ LIBPATH := -L../acpica/target -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/x86_6
 .PHONY: build run debug iso
 
 run: $(ISO)
-	@qemu-system-x86_64 -m size=1024 -vga qxl -cdrom $(ISO)
+	@qemu-system-x86_64 -serial mon:stdio -m size=1024 -smp 2 -usb -device usb-kbd -vga qxl -cdrom $(ISO)
 
 debug: $(ISO)
 	@qemu-system-x86_64 -S -s -cdrom $(ISO)

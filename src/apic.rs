@@ -1,6 +1,7 @@
 // use x86_64::registers::model_specific::Msr;
 use x86_64::instructions::port::Port;
 use x86_64::structures::idt::ExceptionStackFrame;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 
 #[allow(dead_code)]
@@ -13,6 +14,8 @@ const COMMAND_EOI: u8 = 0x20;
 
 static MASTER: Mutex<Pic> = Mutex::new(Pic::new(PORT_PIC_MASTER_COMMAND));
 static SLAVE: Mutex<Pic> = Mutex::new(Pic::new(PORT_PIC_SLAVE_COMMAND));
+
+pub static TIME: AtomicUsize = AtomicUsize::new(0);
 
 bitflags! {
     pub struct Icw1: u8 {
@@ -183,13 +186,7 @@ macro_rules! interrupt {
 }
 
 interrupt!(pit, {
-    static mut TIME: u64 = 0;
-
-    unsafe {
-        TIME += ::pit::NANOSEC_PER_TICK;
-        // println!("Time: {}", TIME / 1_000_000);
-    }
-
+    TIME.fetch_add(::pit::NANOSEC_PER_TICK as usize, Ordering::SeqCst);
     MASTER.lock().send_eoi();
 });
 
