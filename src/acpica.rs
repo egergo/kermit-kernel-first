@@ -2,6 +2,7 @@ use multiboot;
 use core::fmt;
 use core::str;
 use x86_64::instructions::port::Port;
+use ::mem::malloc;
 
 #[allow(non_camel_case_types)]
 type ACPI_SIZE = usize;
@@ -125,16 +126,6 @@ impl fmt::Debug for CStringPrinter {
             }
         }
         Ok(())
-    }
-}
-
-static mut LAST_PTR: usize = 0x10_00000;
-
-pub fn malloc(size: u64) -> usize {
-    unsafe {
-        let result = LAST_PTR;
-        LAST_PTR += size as usize;
-        result
     }
 }
 

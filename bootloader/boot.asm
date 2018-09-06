@@ -15,6 +15,10 @@ start:
 
 	; load the 64-bit GDT
 	lgdt [gdt64.pointer]
+	; mov ax, gdt64.data
+	; mov ss, ax
+	; mov ds, ax
+	; mov es, ax
 	jmp gdt64.code:long_mode_start
 
 	; print `OK` to screen
@@ -88,12 +92,12 @@ check_long_mode:
 set_up_page_tables:
 	; map first P4 entry to P3 table
 	mov eax, p3_table
-	or eax, 0b11 ; present + writable
+	or eax, 0b111 ; user access + present + writable
 	mov [p4_table], eax
 
 	; map first P3 entry to P2 table
 	mov eax, p2_table
-	or eax, 0b11 ; present + writable
+	or eax, 0b111 ; present + writable
 	mov [p3_table], eax
 
 	; TODO map each P2 entry to a huge 2MiB page
@@ -103,7 +107,7 @@ set_up_page_tables:
 	; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
 	mov eax, 0x200000  ; 2MiB
 	mul ecx            ; start address of ecx-th page
-	or eax, 0b10000011 ; present + writable + huge
+	or eax, 0b10000111 ; present + writable + huge
 	mov [p2_table + ecx * 8], eax ; map ecx-th entry
 
 	inc ecx            ; increase counter
@@ -149,7 +153,7 @@ section .rodata
 gdt64:
 	dq 0 ; zero entry
 .code: equ $ - gdt64 ; new
-    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
+    dq (1<<43) | (1<<44)             | (1<<47) | (1<<53) ; code segment
 .pointer:
 	dw $ - gdt64 - 1
 	dq gdt64

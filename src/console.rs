@@ -100,20 +100,20 @@ impl Writer {
             }
         }
 
-        unsafe {
-            use x86_64::instructions::port::Port;
+        // unsafe {
+        //     use x86_64::instructions::port::Port;
 
-            let mut plus0 = Port::<u8>::new(0x3F8);
-            let mut plus5 = Port::<u8>::new(0x3F8 + 5);
+        //     let mut plus0 = Port::<u8>::new(0x3F8);
+        //     let mut plus5 = Port::<u8>::new(0x3F8 + 5);
 
-            loop {
-                if plus5.read() & 0x20 != 0 {
-                    break;
-                }
-            }
+        //     loop {
+        //         if plus5.read() & 0x20 != 0 {
+        //             break;
+        //         }
+        //     }
 
-            plus0.write(byte);
-        }
+        //     plus0.write(byte);
+        // }
     }
 
     fn new_line(&mut self) {

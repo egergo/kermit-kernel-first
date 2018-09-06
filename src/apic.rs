@@ -185,9 +185,22 @@ macro_rules! interrupt {
     )
 }
 
+static mut last_switch: usize = 0;
+
 interrupt!(pit, {
+    unsafe {
+        ::KERNEL_RSP = ::get_rsp();
+    }
     TIME.fetch_add(::pit::NANOSEC_PER_TICK as usize, Ordering::SeqCst);
     MASTER.lock().send_eoi();
+
+    let time = TIME.load(Ordering::SeqCst);
+    unsafe {
+        if time - last_switch > 100_000_000 {
+            last_switch = time;
+            ::proc::PROCESS_MANAGER.tick();
+        }
+    }
 });
 
 interrupt!(keyboard, {
