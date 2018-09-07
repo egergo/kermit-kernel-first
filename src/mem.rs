@@ -1,4 +1,7 @@
-static mut LAST_PTR: usize = 0x10_00000;
+extern {
+    static __cheap_malloc_start: u8;
+}
+static mut LAST_PTR: usize = unsafe { &__cheap_malloc_start as *const u8 as usize };
 
 pub fn malloc(size: u64) -> usize {
     unsafe {

@@ -1,5 +1,6 @@
 global start
 extern long_mode_start
+extern __long_mode_start_32bit
 
 section .text
 bits 32
@@ -83,9 +84,14 @@ check_long_mode:
 	cpuid                  ; returns various feature bits in ecx and edx
 	test edx, 1 << 29      ; test if the LM-bit is set in the D-register
 	jz .no_long_mode       ; If it's not set, there is no long mode
+	; test edx, 1 << 26      ; test if the LM-bit is set in the D-register
+	; jz .no_1gb_pages       ; If it's not set, there is no long mode
 	ret
 .no_long_mode:
 	mov al, "2"
+	jmp panic
+.no_1gb_pages:
+	mov al, "H"
 	jmp panic
 
 
@@ -94,6 +100,14 @@ set_up_page_tables:
 	mov eax, p3_table
 	or eax, 0b111 ; user access + present + writable
 	mov [p4_table], eax
+
+    ; set up 0xFFFFFFFF_80000000 - 0xFFFFFFFF_BFFFFFFF-> 0x00000000_00000000 - 0x00000000_3FFFFFFF (1GiB)
+    mov eax, p3_511_table
+    or eax, 0b111 ; user access + present + writable
+    mov [p4_table + 511 * 8], eax
+
+    mov eax, 0b10000111 ; present + writable + huge
+    mov [p3_511_table + 510 * 8], eax
 
 	; map first P3 entry to P2 table
 	mov eax, p2_table
@@ -166,6 +180,8 @@ p3_table:
 	resb 4096
 p2_table:
 	resb 4096
+p3_511_table:
+    resb 4096
 stack_bottom:
 	resb 40960
 stack_top:

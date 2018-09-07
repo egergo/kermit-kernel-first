@@ -1,7 +1,5 @@
 global long_mode_start
 extern _start
-extern gdt64.code
-extern gdt64.data
 
 section .text
 bits 64

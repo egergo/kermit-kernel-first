@@ -9,6 +9,7 @@
 #![feature(const_raw_ptr_deref)]
 #![feature(extern_prelude)]
 #![feature(naked_functions)]
+#![feature(const_raw_ptr_to_usize_cast)]
 #![feature(asm)]
 
 #![no_std]
