@@ -1,5 +1,6 @@
 target remote localhost:1234
 symbol-file target/kernel.bin
+b start
 b _start
 b double_fault_handler
 b proc.rs:175

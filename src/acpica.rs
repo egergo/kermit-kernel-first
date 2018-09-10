@@ -1,4 +1,3 @@
-use multiboot;
 use core::fmt;
 use core::str;
 use x86_64::instructions::port::Port;
@@ -25,39 +24,41 @@ type ACPI_HANDLE = VOID_PTR;
 #[allow(non_camel_case_types)]
 type ACPI_BUFFER = AcpiBuffer;
 
-const ACPI_TYPE_ANY: ACPI_OBJECT_TYPE = 0x00;
-const ACPI_TYPE_INTEGER: ACPI_OBJECT_TYPE = 0x01;
-const ACPI_TYPE_STRING: ACPI_OBJECT_TYPE = 0x02;
-const ACPI_TYPE_BUFFER: ACPI_OBJECT_TYPE = 0x03;
-const ACPI_TYPE_PACKAGE: ACPI_OBJECT_TYPE = 0x04;
-const ACPI_TYPE_FIELD_UNIT: ACPI_OBJECT_TYPE = 0x05;
-const ACPI_TYPE_DEVICE: ACPI_OBJECT_TYPE = 0x06;
-const ACPI_TYPE_EVENT: ACPI_OBJECT_TYPE = 0x07;
-const ACPI_TYPE_METHOD: ACPI_OBJECT_TYPE = 0x08;
-const ACPI_TYPE_MUTEX: ACPI_OBJECT_TYPE = 0x09;
-const ACPI_TYPE_REGION: ACPI_OBJECT_TYPE = 0x0A;
-const ACPI_TYPE_POWER: ACPI_OBJECT_TYPE = 0x0B;
-const ACPI_TYPE_PROCESSOR: ACPI_OBJECT_TYPE = 0x0C;
-const ACPI_TYPE_THERMAL: ACPI_OBJECT_TYPE = 0x0D;
-const ACPI_TYPE_BUFFER_FIELD: ACPI_OBJECT_TYPE = 0x0E;
-const ACPI_TYPE_DDB_HANDLE: ACPI_OBJECT_TYPE = 0x0F;
-const ACPI_TYPE_DEBUG_OBJECT: ACPI_OBJECT_TYPE = 0x10;
+#[allow(unused)] const ACPI_TYPE_ANY: ACPI_OBJECT_TYPE = 0x00;
+#[allow(unused)] const ACPI_TYPE_INTEGER: ACPI_OBJECT_TYPE = 0x01;
+#[allow(unused)] const ACPI_TYPE_STRING: ACPI_OBJECT_TYPE = 0x02;
+#[allow(unused)] const ACPI_TYPE_BUFFER: ACPI_OBJECT_TYPE = 0x03;
+#[allow(unused)] const ACPI_TYPE_PACKAGE: ACPI_OBJECT_TYPE = 0x04;
+#[allow(unused)] const ACPI_TYPE_FIELD_UNIT: ACPI_OBJECT_TYPE = 0x05;
+#[allow(unused)] const ACPI_TYPE_DEVICE: ACPI_OBJECT_TYPE = 0x06;
+#[allow(unused)] const ACPI_TYPE_EVENT: ACPI_OBJECT_TYPE = 0x07;
+#[allow(unused)] const ACPI_TYPE_METHOD: ACPI_OBJECT_TYPE = 0x08;
+#[allow(unused)] const ACPI_TYPE_MUTEX: ACPI_OBJECT_TYPE = 0x09;
+#[allow(unused)] const ACPI_TYPE_REGION: ACPI_OBJECT_TYPE = 0x0A;
+#[allow(unused)] const ACPI_TYPE_POWER: ACPI_OBJECT_TYPE = 0x0B;
+#[allow(unused)] const ACPI_TYPE_PROCESSOR: ACPI_OBJECT_TYPE = 0x0C;
+#[allow(unused)] const ACPI_TYPE_THERMAL: ACPI_OBJECT_TYPE = 0x0D;
+#[allow(unused)] const ACPI_TYPE_BUFFER_FIELD: ACPI_OBJECT_TYPE = 0x0E;
+#[allow(unused)] const ACPI_TYPE_DDB_HANDLE: ACPI_OBJECT_TYPE = 0x0F;
+#[allow(unused)] const ACPI_TYPE_DEBUG_OBJECT: ACPI_OBJECT_TYPE = 0x10;
 
-const ACPI_ROOT_OBJECT: ACPI_HANDLE = 0xFFFFFFFF_FFFFFFFFusize;
+#[allow(unused)] const ACPI_ROOT_OBJECT: ACPI_HANDLE = 0xFFFFFFFF_FFFFFFFFusize;
 
-const AE_OK: ACPI_STATUS = 0;
+#[allow(unused)] const AE_OK: ACPI_STATUS = 0;
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
 struct AcpiBuffer {
     Length: ACPI_SIZE,
     Pointer: VOID_PTR
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
 struct ACPI_DEVICE_INFO {
     InfoSize: u32,
     Name: ::acpi::Signature4,
@@ -76,16 +77,18 @@ struct ACPI_DEVICE_INFO {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
 struct ACPI_PNP_DEVICE_ID {
     Length: u32,
     Str: CString
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
 struct ACPI_PNP_DEVICE_ID_LIST {
     Count: u32,
     ListSize: u32,
@@ -93,7 +96,7 @@ struct ACPI_PNP_DEVICE_ID_LIST {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct CString(*const u8);
 impl CString {
     pub unsafe fn to_str(&self) -> &str {
@@ -234,7 +237,7 @@ fn get_handle(parent: Option<ACPI_HANDLE>, path: &str) -> Result<ACPI_HANDLE, AC
 
     match res {
         0 => Ok(out),
-        x => Err(res)
+        _ => Err(res)
     }
 }
 
@@ -272,7 +275,7 @@ fn evaluate_object(parent: Option<ACPI_HANDLE>, path: &str) -> Result<ACPI_BUFFE
 
     match res {
         0 => Ok(out),
-        x => Err(res)
+        _ => Err(res)
     }
 }
 
@@ -280,9 +283,7 @@ fn evaluate_object(parent: Option<ACPI_HANDLE>, path: &str) -> Result<ACPI_BUFFE
 struct OwnedDeviceInfo(&'static ACPI_DEVICE_INFO);
 impl Drop for OwnedDeviceInfo {
     fn drop(&mut self) {
-        unsafe {
-            AcpiOsFree(self.0 as *const _ as usize);
-        }
+        AcpiOsFree(self.0 as *const _ as usize);
     }
 }
 
@@ -291,10 +292,12 @@ fn get_object_info(handle: ACPI_HANDLE) -> Result<OwnedDeviceInfo, ACPI_STATUS> 
     let res = unsafe { AcpiGetObjectInfo(handle, &mut info) };
     match res {
         0 => Ok(OwnedDeviceInfo(info)),
-        x => Err(res)
+        _ => Err(res)
     }
 }
 
+#[allow(non_snake_case)]
+#[allow(unused)]
 extern "C" fn walk_callback(ObjHandle: ACPI_HANDLE, Level: u32, Context: VOID_PTR) -> VOID_PTR {
     if Level != 1 && false {
         return 0
@@ -316,7 +319,9 @@ extern "C" fn walk_callback(ObjHandle: ACPI_HANDLE, Level: u32, Context: VOID_PT
     }
 }
 
-extern "C" fn walk_callback2(ObjHandle: ACPI_HANDLE, Level: u32, Context: VOID_PTR) -> VOID_PTR {
+#[allow(non_snake_case)]
+#[allow(unused)]
+extern "C" fn walk_callback2(ObjHandle: ACPI_HANDLE, _evel: u32, Context: VOID_PTR) -> VOID_PTR {
     0
 }
 
@@ -340,6 +345,7 @@ pub extern "C" fn AcpiOsAllocate(Size: ACPI_SIZE) -> VOID_PTR {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsFree(Memory: VOID_PTR) {
     // println!("AcpiOsFree({:x})", Memory);
 }
@@ -381,6 +387,7 @@ pub extern "C" fn AcpiOsWritePciConfiguration() {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsSignalSemaphore(Handle: ACPI_SEMAPHORE, Units: u32) -> ACPI_STATUS {
     // println!("AcpiOsSignalSemaphore({}, {})", Handle, Units);
     0
@@ -395,6 +402,7 @@ pub extern "C" fn AcpiOsDeleteSemaphore() {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsAcquireLock(Handle: ACPI_SPINLOCK) -> u64 {
     // println!("AcpiOsAcquireLock({})", Handle);
     0
@@ -402,6 +410,7 @@ pub extern "C" fn AcpiOsAcquireLock(Handle: ACPI_SPINLOCK) -> u64 {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsReleaseLock(Handle: ACPI_SPINLOCK, Flags: u64) {
     // println!("AcpiOsReleaseLock({}, {})", Handle, Flags);
 }
@@ -534,6 +543,7 @@ pub extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsVprintf(Format: VOID_PTR, _Args: VOID_PTR) {
     println!("AcpiOsVprintf({:?})", CStringPrinter(Format));
     // panic!();
@@ -542,6 +552,7 @@ pub extern "C" fn AcpiOsVprintf(Format: VOID_PTR, _Args: VOID_PTR) {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsWaitSemaphore(Handle: ACPI_SEMAPHORE, Units: u32, Timeout: u16) -> ACPI_STATUS {
     // println!("AcpiOsWaitSemaphore({}, {}, {})", Handle, Units, Timeout);
     0
@@ -556,6 +567,7 @@ pub extern "C" fn AcpiOsWaitEventsComplete() {
 
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(unused)]
 pub extern "C" fn AcpiOsInstallInterruptHandler(InterruptLevel: u32, Handler: usize, Context: VOID_PTR) -> ACPI_STATUS {
     println!("AcpiOsInstallInterruptHandler(0x{:x})", InterruptLevel);
     0

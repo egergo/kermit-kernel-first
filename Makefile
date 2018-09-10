@@ -5,7 +5,7 @@ CC = /usr/bin/gcc
 CFLAGS =  -std=c99 -Wall -mno-red-zone -m64 -g -nostdlib
 
 LIBKERNEL := target/x86_64-unknown-none/debug/libblog_os.a
-LIBKERNEL_SRC := Cargo.toml x86_64-unknown-none.json src/*
+LIBKERNEL_SRC := Cargo.toml x86_64-unknown-none.json src/* src/**/*
 
 BOOTLOADER_SRC_PATTERN := bootloader/%.asm
 BOOTLOADER_OBJ_PATTERN := target/bootloader/%.o

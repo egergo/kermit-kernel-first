@@ -2,7 +2,7 @@ use core::mem;
 use core::fmt;
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct Rsdp {
     signature: Signature8,
     checksum: u8,
@@ -16,7 +16,7 @@ pub struct Rsdp {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct SdtHeader {
     pub signature: Signature4,
     pub length: u32,
@@ -32,6 +32,7 @@ pub struct SdtHeader {
 macro_rules! char_array_struct {
     ($name:ident, $size:expr) => {
         #[derive(Copy, Clone)]
+        #[repr(C)]
         pub struct $name([u8; $size]);
         impl fmt::Debug for $name {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -6,15 +6,15 @@ pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
-const GDT_DPL0: u64 = 0 << 45;
-const GDT_DPL3: u64 = 3 << 45;
-const GDT_PRESENT: u64 = 1 << 47;
-const GDT_LONG_MODE: u64 = 1 << 53;
-const GDT_CODE_READABLE: u64 = 1 << 41;
-const GDT_DATA_WRITABLE: u64 = 1 << 41;
-const GDT_TYPE_SYSTEM: u64 = 0 << 44;
-const GDT_TYPE_USER: u64 = 1 << 44;
-const GDT_EXECUTABLE: u64 = 1 << 43;
+#[allow(unused)] const GDT_DPL0: u64 = 0 << 45;
+#[allow(unused)] const GDT_DPL3: u64 = 3 << 45;
+#[allow(unused)] const GDT_PRESENT: u64 = 1 << 47;
+#[allow(unused)] const GDT_LONG_MODE: u64 = 1 << 53;
+#[allow(unused)] const GDT_CODE_READABLE: u64 = 1 << 41;
+#[allow(unused)] const GDT_DATA_WRITABLE: u64 = 1 << 41;
+#[allow(unused)] const GDT_TYPE_SYSTEM: u64 = 0 << 44;
+#[allow(unused)] const GDT_TYPE_USER: u64 = 1 << 44;
+#[allow(unused)] const GDT_EXECUTABLE: u64 = 1 << 43;
 // const GDT
 
 lazy_static! {
@@ -62,7 +62,7 @@ pub fn init() {
             const STACK_SIZE: usize = 4096;
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
-            let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
+            let stack_start = VirtAddr::from_ptr(&STACK);
             let stack_end = stack_start + STACK_SIZE;
             stack_end
         };

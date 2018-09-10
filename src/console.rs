@@ -43,6 +43,7 @@ macro_rules! println {
 
 pub fn print(args: fmt::Arguments) {
     use core::fmt::Write;
+    unsafe { WRITER.force_unlock(); }
     WRITER.lock().write_fmt(args).unwrap();
 }
 

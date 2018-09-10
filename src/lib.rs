@@ -10,6 +10,7 @@
 #![feature(extern_prelude)]
 #![feature(naked_functions)]
 #![feature(const_raw_ptr_to_usize_cast)]
+#![feature(const_let)]
 #![feature(asm)]
 
 #![no_std]
@@ -33,6 +34,7 @@ pub mod acpica;
 pub mod multiboot;
 pub mod mem;
 pub mod proc;
+pub mod interrupts;
 
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{ExceptionStackFrame, InterruptDescriptorTable};
@@ -92,6 +94,7 @@ lazy_static! {
 }
 
 #[no_mangle]
+#[allow(unreachable_code)]
 pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     println!("Kermit!");
     println!("");
@@ -102,9 +105,9 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     println!("Setting up GDT...");
     gdt::init();
     println!("Setting up IDT...");
-    IDT.load();
+    interrupts::init();
     // println!("int3...");
-    // x86_64::instructions::int3();
+    x86_64::instructions::int3();
 
     println!("Setting up ACPI...");
     acpi::init();
@@ -128,13 +131,11 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     // stack_overflow();
 
     println!("Detecting memory...");
-    unsafe {
-        let mbi = multiboot::get();
-        let mm = mbi.memory_map_tag().expect("Memory map not provided by GRUB");
-        for memory_area in mm.memory_areas() {
-            println!("Memory: {:016x} - {:016x} ({} bytes)", memory_area.start_address(), memory_area.end_address(), memory_area.size());
-            // pages::init_first_page(memory_area.start_address() / 4096);
-        }
+    let mbi = multiboot::get();
+    let mm = mbi.memory_map_tag().expect("Memory map not provided by GRUB");
+    for memory_area in mm.memory_areas() {
+        println!("Memory: {:016x} - {:016x} ({} bytes)", memory_area.start_address(), memory_area.end_address(), memory_area.size());
+        // pages::init_first_page(memory_area.start_address() / 4096);
     }
 
     let p1 = proc::Proc::new();
@@ -174,6 +175,35 @@ extern "C" fn process_handler1() {
             int 80h
         " : : : "rax" : "intel")
     }
+
+    unsafe {
+        asm!("
+            mov rax, 1337
+            syscall
+        " : : : "rax" : "intel")
+    }
+
+    unsafe {
+        let rax: u64;
+
+        asm!("mov $0, rax" : "=r"(rax) ::: "intel");
+            // mov $1,rbx, 667
+            // mov rcx, 668
+            // mov rdx, 669
+            // mov rsi, 670
+            // mov rdi, 671
+            // mov rbp, 672
+            // mov r9, 709
+            // mov r10, 710
+            // mov r11, 711
+            // mov r12, 712
+            // mov r13, 713
+            // mov r14, 714
+            // mov r15, 715
+        println!("RAX: {}", rax);
+    }
+
+
 
     println!("After int80");
     loop {
@@ -254,7 +284,7 @@ extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStac
     println!("EXCEPTION: Divide by Zero\n{:#?}", stack_frame);
 }
 
-extern "x86-interrupt" fn handle_syscall(stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn handle_syscall(_stack_frame: &mut ExceptionStackFrame) {
     // unsafe {
     //     let current_proc = ::proc::PROCESS_MANAGER.current_proc();
     //     // current_proc.rsp = stack_frame.stack_pointer.as_u64() as usize;
@@ -293,7 +323,7 @@ extern "x86-interrupt" fn handle_syscall(stack_frame: &mut ExceptionStackFrame) 
 fn thread_starter() {
     unsafe {
         println!("Thread starter");
-        let mut current_proc = ::proc::PROCESS_MANAGER.current_proc();
+        let current_proc = ::proc::PROCESS_MANAGER.current_proc();
         proc::run_in_user_mode(process_handler2 as *const u8 as usize, current_proc.stack);
     }
 }

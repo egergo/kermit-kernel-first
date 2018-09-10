@@ -100,6 +100,7 @@ pub struct ScratchRegisters {
     pub rax: usize,
 }
 
+#[allow(unused_macros)]
 macro_rules! scratch_push {
     () => (asm!(
         "push rax
@@ -115,6 +116,7 @@ macro_rules! scratch_push {
     ));
 }
 
+#[allow(unused_macros)]
 macro_rules! scratch_pop {
     () => (asm!(
         "pop r11
@@ -174,7 +176,7 @@ impl ProcessManager {
 
         let from_proc = self.current;
         let to_proc = (self.current + 1) % self.count;
-        if (from_proc == to_proc) {
+        if from_proc == to_proc {
             return;
         }
 
@@ -237,6 +239,7 @@ struct InterruptStack {
 }
 
 impl InterruptStack {
+    #[allow(unused)]
     pub unsafe fn load(addr: usize) -> &'static mut InterruptStack {
         &mut*(addr as *mut _)
     }
@@ -251,7 +254,7 @@ pub struct Proc {
 
 impl Proc {
     pub fn new() -> Proc {
-        let mut result = Proc {
+        let result = Proc {
             stack: malloc(4096) + 4096,
             kstack: (malloc(4096) + 4096),
             rsp: 0

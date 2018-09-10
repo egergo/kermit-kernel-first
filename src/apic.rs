@@ -185,7 +185,7 @@ macro_rules! interrupt {
     )
 }
 
-static mut last_switch: usize = 0;
+static mut LAST_SWITCH: usize = 0;
 
 interrupt!(pit, {
     unsafe {
@@ -196,8 +196,8 @@ interrupt!(pit, {
 
     let time = TIME.load(Ordering::SeqCst);
     unsafe {
-        if time - last_switch > 100_000_000 {
-            last_switch = time;
+        if time - LAST_SWITCH > 100_000_000 {
+            LAST_SWITCH = time;
             ::proc::PROCESS_MANAGER.tick();
         }
     }
