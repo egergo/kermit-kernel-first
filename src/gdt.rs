@@ -4,7 +4,8 @@ use x86_64::structures::tss::TaskStateSegment;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
-static mut TSS: TaskStateSegment = TaskStateSegment::new();
+#[no_mangle]
+pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
 #[allow(unused)] const GDT_DPL0: u64 = 0 << 45;
 #[allow(unused)] const GDT_DPL3: u64 = 3 << 45;

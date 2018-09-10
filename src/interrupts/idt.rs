@@ -279,7 +279,7 @@ impl HardwareIdt {
             HardwareIdtEntry::new(handlers::handle_irq_254),
             HardwareIdtEntry::new(handlers::handle_irq_255)
         ]);
-        result.0[8].options.0 |= (::gdt::DOUBLE_FAULT_IST_INDEX & 0x0F);
+        result.0[8].options.0 |= ::gdt::DOUBLE_FAULT_IST_INDEX & 0x0F;
         result.0[0x80].options.0 |= 3 << 13;
         result
     }

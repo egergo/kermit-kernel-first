@@ -17,10 +17,9 @@ pub fn init() {
     unsafe {
         let addr = handle_fast_syscall as *const u8 as u64;
 
-        asm!("wrmsr" :: "{ecx}"(0xC0000082u32), "{edx}"(addr >> 32), "{eax}"(addr as u32) :: "intel"); // IA32_LSTAR
-        // asm!("wrmsr" :: "rax"(0), "rdx"(8 | (24 + 3) << 16), "rcx"(0xC0000081u64) :: "intel"); // STAR
-        asm!("wrmsr" :: "{eax}"(0), "{edx}"(8 | 27 << 16), "{ecx}"(0xC0000081u32) :: "intel"); // STAR
-        asm!("wrmsr" :: "{eax}"(0), "{edx}"(0), "{ecx}"(0xC0000084u32) :: "intel"); // STAR
+        asm!("wrmsr" :: "{ecx}"(0xC0000082u32), "{edx}"(addr >> 32), "{eax}"(addr as u32) :: "intel"); // IA32_LSTAR -> syscall address
+        asm!("wrmsr" :: "{eax}"(0), "{edx}"(8 | 27 << 16), "{ecx}"(0xC0000081u32) :: "intel"); // STAR -> used segments
+        asm!("wrmsr" :: "{eax}"(0), "{edx}"(0), "{ecx}"(0xC0000084u32) :: "intel"); // flasgs mask
         asm!("
             rdmsr
             or eax, 1
@@ -82,19 +81,21 @@ pub extern "C" fn handle_irq() -> ! {
 
 #[no_mangle]
 pub extern "C" fn run_interrupt_fn(vars: &mut InteruptStack) {
-    println!("xxxyyy {:?}", vars);
+    // println!("{:?}", vars);
 
-    match vars.number {
+    let irq = vars.number;
+    match irq {
         3 => {},
         32 => {},
         13 => panic!("GPF"),
         0x80 => handle_syscall(vars),
-        _ => panic!("Unknown int {}", vars.number)
+        _ => panic!("Unknown int {}", irq)
     }
 }
 
 fn handle_syscall(vars: &mut InteruptStack) {
-    println!("Syscall rax={}", vars.rax);
+    let syscall_number = vars.rax;
+    println!("Syscall rax={}", syscall_number);
 
     unsafe {
         asm!("
@@ -124,16 +125,17 @@ pub static SCRATCH_RSP: u64 = 0;
 #[naked]
 fn handle_fast_syscall() -> ! {
     unsafe {
-        // TODO: switch to kstack
         asm!("
             mov SCRATCH_RSP, rsp
+            mov rsp, TSS + 4
+
             push 35
             push SCRATCH_RSP
             push r11
             push 27
             push rcx
 
-            push 0
+            push 1
             push 0x80
 
             jmp handle_irq
