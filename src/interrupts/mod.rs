@@ -28,7 +28,7 @@ pub fn init() {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct InteruptStack {
     // pub r15: u64,
@@ -85,37 +85,129 @@ pub extern "C" fn run_interrupt_fn(vars: &mut InteruptStack) {
 
     let irq = vars.number;
     match irq {
-        3 => {},
-        32 => {},
-        13 => panic!("GPF"),
+        3 => {}, // debug
+        14 => {
+            let cr2: u64;
+            unsafe {
+                asm!("mov $0, cr2" : "=r"(cr2) ::: "intel");
+            }
+            panic!("PF at 0x{:x} accessing 0x{:x}", vars.rip, cr2);
+        },
+        32 => {}, // timer
+        13 => panic!("GPF at 0x{:x}", vars.rip),
         0x80 => handle_syscall(vars),
         _ => panic!("Unknown int {}", irq)
     }
 }
 
-fn handle_syscall(vars: &mut InteruptStack) {
-    let syscall_number = vars.rax;
-    println!("Syscall rax={}", syscall_number);
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+struct Winsize {
+    pub ws_row: u16,
+    pub ws_col: u16,
+    pub ws_xpixel: u16,
+    pub ws_ypixel: u16,
+}
 
-    unsafe {
-        asm!("
-            mov rax, 666
-            mov rbx, 667
-            mov rcx, 668
-            mov rdx, 669
-            mov rsi, 670
-            mov rdi, 671
-            mov r9, 709
-            mov r10, 710
-            mov r11, 711
-            mov r12, 712
-            mov r13, 713
-            mov r14, 714
-            mov r15, 715
-        " ::: "rsi", "rdi", "rbx" : "intel", "volatile");
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+struct Iovec {
+    pub iov_base: usize,
+    pub iov_len: usize
+}
+
+impl Iovec {
+    pub unsafe fn load_slice(iov: usize, iovcnt: usize) -> &'static [Iovec] {
+        core::slice::from_raw_parts(iov as *const Iovec, iovcnt)
     }
 
-    vars.rax = 17;
+    pub unsafe fn to_str<'a>(&'a self) -> &'a str {
+        let sl = core::slice::from_raw_parts(self.iov_base as *const u8, self.iov_len);
+        core::str::from_utf8_unchecked(sl)
+    }
+}
+
+fn handle_syscall(vars: &mut InteruptStack) {
+    let syscall_number = vars.rax;
+
+    // http://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
+    match syscall_number {
+        16 => {
+            println!("Syscall: ioctl fd={:x} request={:x} ptr={:x}", vars.rdi, vars.rsi, vars.rdx);
+            match vars.rsi {
+                0x5413 => { // TIOCGWINSZ
+                    unsafe {
+                        let mut winsize = &mut*(vars.rdx as *mut Winsize);
+                        winsize.ws_row = 25;
+                        winsize.ws_col = 80;
+                    }
+                },
+                _ => panic!("Unknown ioctl")
+            }
+            vars.rax = 0;
+        },
+        20 => {
+            println!("Syscall: writev fd={:x} iov={:x} iovcnt={}", vars.rdi, vars.rsi, vars.rdx);
+            let mut bytes_written = 0;
+            unsafe {
+                let vecs = Iovec::load_slice(vars.rsi as usize, vars.rdx as usize);
+                for vec in vecs {
+                    bytes_written += vec.iov_len;
+                    println!("-> {}", vec.to_str());
+                }
+            }
+            vars.rax = bytes_written as u64;
+        },
+        158 => {
+            // %rdi, %rsi, %rdx, %r10, %r8 and %r9
+            println!("Syscall: arch_prctl code={:x} addr={:x}", vars.rdi, vars.rsi);
+            if vars.rdi == 0x1002 { // ARCH_SET_FS
+                unsafe {
+                    let addr = vars.rsi;
+                    asm!("wrmsr" :: "{ecx}"(0xC0000100u32), "{edx}"(addr >> 32), "{eax}"(addr as u32) :: "intel"); // FSBASE
+                }
+            } else {
+                panic!("Unknown ARCH_SET_FS {:x}", vars.rdi);
+            }
+            vars.rax = 0;
+        },
+        218 => { //
+            println!("Syscall: set_tid_address tidptr={:x}", vars.rdi);
+            unsafe {
+                let mut asdf = vars.rdi as *mut usize;
+                *asdf = 0usize;
+            }
+            vars.rax = 1; // thread id
+        },
+        231 => {
+            println!("Syscall: exit_group code={:x}", vars.rdi);
+            loop {};
+        }
+        x => {
+            println!("Syscall rax={} 1={:x} 2={:x} 3={:x}", syscall_number, vars.rdi, vars.rsi, vars.rdx);
+            panic!("Unhandled syscall {:x}", x);
+        }
+    }
+
+    // unsafe {
+    //     asm!("
+    //         mov rax, 666
+    //         mov rbx, 667
+    //         mov rcx, 668
+    //         mov rdx, 669
+    //         mov rsi, 670
+    //         mov rdi, 671
+    //         mov r9, 709
+    //         mov r10, 710
+    //         mov r11, 711
+    //         mov r12, 712
+    //         mov r13, 713
+    //         mov r14, 714
+    //         mov r15, 715
+    //     " ::: "rsi", "rdi", "rbx" : "intel", "volatile");
+    // }
+
+    // vars.rax = 17;
 }
 
 #[no_mangle]

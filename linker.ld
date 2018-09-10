@@ -50,13 +50,9 @@ SECTIONS {
 
 	.text :
 	{
-        /* target/bootloader/boot.o(.text)
-            . = ALIGN(4096); */
 		*(.text .text.*)
             . = ALIGN(4096);
 	}
-
-    /* __long_mode_start_32bit = long_mode_start - KERNEL_OFFSET2; */
 
     .bss :
     {

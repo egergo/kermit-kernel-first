@@ -35,6 +35,7 @@ pub mod multiboot;
 pub mod mem;
 pub mod proc;
 pub mod interrupts;
+pub mod elf;
 
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{ExceptionStackFrame, InterruptDescriptorTable};
@@ -165,8 +166,32 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     }
 }
 
+extern "C" {
+    static __hello_start: u8;
+    static __hello_end: u8;
+}
+
 extern "C" fn process_handler1() {
-    println!("Hello World from Process1");
+    unsafe {
+        println!("Hello World from Process1 {:x} {:x}", &__hello_start as *const _ as usize, &__hello_end as *const _ as usize);
+
+        let prog = elf::ElfHeader::load(&__hello_start as *const _ as usize);
+        // println!("Hello World from Process1 {:?}", prog);
+        // println!("Hello World from Process1 {:?}", prog.program_header());
+        prog.load_to_memory();
+
+        asm!("
+            push 0
+            push 0
+            push 0
+            push 0
+            push 0
+            push 0
+            push 0
+            push 0
+        " :::: "intel");
+        asm!("jmp $0" :: "r"(prog.entry) :: "intel");
+    }
     let mut last_time = 0usize;
 
     unsafe {

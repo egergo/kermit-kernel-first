@@ -13,4 +13,5 @@ pub fn malloc(size: u64) -> usize {
 }
 extern "C" {
     pub fn memcpy(dst: usize, src: usize, num: usize) -> usize;
+    pub fn memset(ptr: usize, value: u32, num: usize) -> usize;
 }

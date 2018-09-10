@@ -44,5 +44,9 @@ $(BOOTLOADER_OBJ_PATTERN): $(BOOTLOADER_SRC_PATTERN)
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
 
-$(KERNEL): $(LINKER_SCRIPT) $(BOOTLOADER_OBJ) $(LIBKERNEL)
-	@ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) --start-group $(LIBKERNEL) -lacpica -lgcc --end-group
+target/blobs/hello.o: blobs/hello.asm blobs/hello
+	@mkdir -p $(shell dirname $@)
+	@nasm -felf64 $< -o $@
+
+$(KERNEL): $(LINKER_SCRIPT) $(BOOTLOADER_OBJ) $(LIBKERNEL) target/blobs/hello.o
+	@ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) target/blobs/hello.o --start-group $(LIBKERNEL) -lacpica -lgcc --end-group
