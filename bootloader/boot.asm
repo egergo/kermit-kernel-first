@@ -1,4 +1,6 @@
 global start
+global p4_table
+global p3_511_table
 extern long_mode_start
 extern __long_mode_start_32bit
 

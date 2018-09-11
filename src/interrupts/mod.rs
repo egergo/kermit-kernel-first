@@ -4,6 +4,8 @@ mod idt;
 mod macros;
 
 use self::idt::HardwareIdt;
+use ::memory::tables::{EntryFlags};
+use ::memory::pages::{alloc_page};
 
 lazy_static! {
     static ref IDT: HardwareIdt = {
@@ -79,11 +81,12 @@ pub extern "C" fn handle_irq() -> ! {
     }
 }
 
+pub static mut enabled: bool = true;
+
 #[no_mangle]
 pub extern "C" fn run_interrupt_fn(vars: &mut InteruptStack) {
-    // println!("{:?}", vars);
-
     let irq = vars.number;
+    // println!("IRQ starts {}", irq);
     match irq {
         3 => {}, // debug
         14 => {
@@ -91,13 +94,54 @@ pub extern "C" fn run_interrupt_fn(vars: &mut InteruptStack) {
             unsafe {
                 asm!("mov $0, cr2" : "=r"(cr2) ::: "intel");
             }
-            panic!("PF at 0x{:x} accessing 0x{:x}", vars.rip, cr2);
+
+            let pages = ::memory::tables::PageTable::address_to_tables(cr2);
+
+            unsafe {
+                if !enabled {
+                    panic!("PF at 0x{:x} accessing 0x{:x} {:?}", vars.rip, cr2, pages);
+                }
+            }
+
+            let table4 = unsafe { &mut ::memory::tables::PROC_TABLE };
+            let table3 = {
+                if !table4.0[pages.0].is_present() {
+                    let page = alloc_page(1);
+                    table4.0[pages.0].set(page, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::USER_ACCESSIBLE);
+                    println!("Created Level 3 page: {:x}", page);
+                }
+                unsafe { table4.0[pages.0].as_table(0xFFFFFFFF_80000000) }
+            };
+            let table2 = {
+                if !table3.0[pages.1].is_present() {
+                    let page = alloc_page(1);
+                    table3.0[pages.1].set(page, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::USER_ACCESSIBLE);
+                    println!("Created Level 2 page: {:x}", page);
+                }
+                unsafe { table3.0[pages.1].as_table(0xFFFFFFFF_80000000) }
+            };
+            let table1 = {
+                if !table2.0[pages.2].is_present() {
+                    let page = alloc_page(1);
+                    table2.0[pages.2].set(page, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::USER_ACCESSIBLE);
+                    println!("Created Level 1 page: {:x}", page);
+                }
+                unsafe { table2.0[pages.2].as_table(0xFFFFFFFF_80000000) }
+            };
+            if !table1.0[pages.3].is_present() {
+                let page = alloc_page(1);
+                table1.0[pages.3].set(page, EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::USER_ACCESSIBLE);
+                // println!("Created used page: {:x} -> {:x} (RIP: {:x})", page, cr2, vars.rip);
+            }
+            // panic!("PF at 0x{:x} accessing 0x{:x} {:?}", vars.rip, cr2, pages);
         },
         32 => {}, // timer
         13 => panic!("GPF at 0x{:x}", vars.rip),
         0x80 => handle_syscall(vars),
         _ => panic!("Unknown int {}", irq)
     }
+
+    // println!("IRQend {}", irq);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -127,11 +171,35 @@ impl Iovec {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+struct Pollfd {
+    pub fd: i32,
+    pub events: i32,
+    pub revents: i32
+}
+
+impl Pollfd {
+    pub unsafe fn load_slice(fds: usize, nfds: usize) -> &'static [Self] {
+        core::slice::from_raw_parts(fds as *const Pollfd, nfds)
+    }
+}
+
 fn handle_syscall(vars: &mut InteruptStack) {
     let syscall_number = vars.rax;
+    // println!("Sys");
 
     // http://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
     match syscall_number {
+        7 => {
+            println!("Syscall: poll fds={:x} nfds={:x} timeout={:x}", vars.rdi, vars.rsi, vars.rdx);
+            unsafe {
+                let polls = Pollfd::load_slice(vars.rdi as usize, vars.rsi as usize);
+                println!("FDS: {:?}", polls)
+            }
+            panic!();
+            vars.rax = 0;
+        },
         16 => {
             println!("Syscall: ioctl fd={:x} request={:x} ptr={:x}", vars.rdi, vars.rsi, vars.rdx);
             match vars.rsi {
@@ -188,6 +256,8 @@ fn handle_syscall(vars: &mut InteruptStack) {
             panic!("Unhandled syscall {:x}", x);
         }
     }
+
+    // println!("Sysend");
 
     // unsafe {
     //     asm!("

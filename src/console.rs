@@ -27,7 +27,7 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        buffer: unsafe { &mut *(0xFFFFFFFF_800b8000 as *mut Buffer) },
     });
 }
 
@@ -101,24 +101,25 @@ impl Writer {
             }
         }
 
-        // unsafe {
-        //     use x86_64::instructions::port::Port;
+        unsafe {
+            use x86_64::instructions::port::Port;
 
-        //     let mut plus0 = Port::<u8>::new(0x3F8);
-        //     let mut plus5 = Port::<u8>::new(0x3F8 + 5);
+            let mut plus0 = Port::<u8>::new(0x3F8);
+            let mut plus5 = Port::<u8>::new(0x3F8 + 5);
 
-        //     loop {
-        //         if plus5.read() & 0x20 != 0 {
-        //             break;
-        //         }
-        //     }
+            loop {
+                if plus5.read() & 0x20 != 0 {
+                    break;
+                }
+            }
 
-        //     plus0.write(byte);
-        // }
+            plus0.write(byte);
+        }
     }
 
     fn new_line(&mut self) {
-        unsafe { memcpy(0xb8000, 0xb80A0, 0xF00); }
+        let addr = self.buffer as *const _ as usize;
+        unsafe { memcpy(addr, addr + 0xA0, 0xF00); }
         // for row in 1..BUFFER_HEIGHT {
         //     for col in 0..BUFFER_WIDTH {
         //         let character = self.buffer.chars[row][col];

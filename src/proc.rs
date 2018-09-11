@@ -259,7 +259,6 @@ impl Proc {
             kstack: (malloc(4096) + 4096),
             rsp: 0
         };
-        println!("New Proc: stack: {:x} kstack: {:x}", result.stack, result.kstack);
         result
     }
 

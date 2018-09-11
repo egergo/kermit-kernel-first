@@ -42,7 +42,7 @@ macro_rules! handle_irq_n_code {
 #[naked] pub extern "C" fn handle_irq_11() -> ! { handle_irq_n_code!(11); }
 #[naked] pub extern "C" fn handle_irq_12() -> ! { handle_irq_n_code!(12); }
 #[naked] pub extern "C" fn handle_irq_13() -> ! { handle_irq_n_code!(13); }
-#[naked] pub extern "C" fn handle_irq_14() -> ! { handle_irq_n!(14); }
+#[naked] pub extern "C" fn handle_irq_14() -> ! { handle_irq_n_code!(14); }
 #[naked] pub extern "C" fn handle_irq_15() -> ! { handle_irq_n!(15); }
 #[naked] pub extern "C" fn handle_irq_16() -> ! { handle_irq_n!(16); }
 #[naked] pub extern "C" fn handle_irq_17() -> ! { handle_irq_n_code!(17); }

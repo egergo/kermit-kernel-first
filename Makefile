@@ -27,7 +27,7 @@ run: $(ISO)
 	@qemu-system-x86_64 -serial mon:stdio -m size=1024 -smp 2 -usb -device usb-kbd -vga qxl -cdrom $(ISO)
 
 debug: $(ISO)
-	@qemu-system-x86_64 -S -s -cdrom $(ISO)
+	@qemu-system-x86_64 -d int -S -s -cdrom $(ISO)
 
 iso: $(ISO)
 
@@ -48,5 +48,9 @@ target/blobs/hello.o: blobs/hello.asm blobs/hello
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
 
-$(KERNEL): $(LINKER_SCRIPT) $(BOOTLOADER_OBJ) $(LIBKERNEL) target/blobs/hello.o
-	@ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) target/blobs/hello.o --start-group $(LIBKERNEL) -lacpica -lgcc --end-group
+target/blobs/ld.o: blobs/ld.asm blobs/ld-musl-x86_64.so.1
+	@mkdir -p $(shell dirname $@)
+	@nasm -felf64 $< -o $@
+
+$(KERNEL): $(LINKER_SCRIPT) $(BOOTLOADER_OBJ) $(LIBKERNEL) target/blobs/hello.o target/blobs/ld.o
+	@ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) target/blobs/hello.o target/blobs/ld.o --start-group $(LIBKERNEL) -lacpica -lgcc --end-group

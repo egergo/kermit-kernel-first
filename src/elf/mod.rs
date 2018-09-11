@@ -52,8 +52,10 @@ pub struct ElfSectionHeader {
 }
 
 const PT_LOAD: u32 = 1;
+const PT_DYNAMIC: u32 = 2;
 const PT_GNU_STACK: u32 = 0x6474e551;
 const PT_GNU_RELRO: u32 = 0x6474e552;
+const PT_GNU_EH_FRAME: u32 = 0x6474e550;
 
 impl ElfHeader {
     pub unsafe fn load(addr: usize) -> &'static Self {
@@ -75,11 +77,18 @@ impl ElfHeader {
         for header in self.program_header() {
             match header.p_type {
                 PT_LOAD => {
+                    ::mem::memset(header.virtual_address as usize, 0, header.memory_size as usize);
                     ::mem::memcpy(header.virtual_address as usize, addr + header.offset as usize, header.file_size as usize);
                     println!("LOAD: {:x} -> {:x} ({}b)", header.offset, header.virtual_address, header.file_size);
                 },
+                PT_DYNAMIC => {
+                    ::mem::memset(header.virtual_address as usize, 0, header.memory_size as usize);
+                    ::mem::memcpy(header.virtual_address as usize, addr + header.offset as usize, header.file_size as usize);
+                    println!("DYNAMIC: {:x} -> {:x} ({}b)", header.offset, header.virtual_address, header.file_size);
+                }
                 PT_GNU_STACK => {},
                 PT_GNU_RELRO => {},
+                PT_GNU_EH_FRAME => {},
                 x => {
                     panic!("Unknown p_type: 0x{:x}", x)
                 }

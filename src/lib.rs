@@ -36,6 +36,7 @@ pub mod mem;
 pub mod proc;
 pub mod interrupts;
 pub mod elf;
+pub mod memory;
 
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{ExceptionStackFrame, InterruptDescriptorTable};
@@ -139,7 +140,7 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
         // pages::init_first_page(memory_area.start_address() / 4096);
     }
 
-    let p1 = proc::Proc::new();
+    let mut p1 = proc::Proc::new();
 
     unsafe {
         ::proc::PROCESS_MANAGER.add_proc(p1);
@@ -148,7 +149,25 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
         // ::proc::PROCESS_MANAGER.tick();
 
         ::gdt::set_kernel_stack(x86_64::VirtAddr::new(p1.kstack as u64));
-        proc::run_in_user_mode(process_handler1 as *const u8 as usize, p1.stack);
+        ::memory::tables::init();
+
+        // x86_64::registers::control::Cr3:
+        asm!("mov cr3, $0" : : "r"(&::memory::tables::p4_table as *const _ as u64) : : "intel", "volatile");
+        // println!("Shit: {:x}", (&::memory::tables::PROC_TABLE as *const _ as u64 - 0xFFFFFFFF_80000000u64));
+        asm!("mov cr3, $0" : : "r"(&::memory::tables::PROC_TABLE as *const _ as u64 - 0xFFFFFFFF_80000000u64) : : "intel", "volatile");
+        // asm!("hlt");
+
+        // let prog = elf::ElfHeader::load(&__hello_start as *const _ as usize);
+        let prog = elf::ElfHeader::load(&__ld_start as *const _ as usize);
+        p1.stack = create_app_stack(prog.entry as usize);
+        prog.load_to_memory();
+
+        interrupts::enabled = false;
+
+        let t = &mut ::memory::tables::PROC_TABLE;
+        // t.create_or_get_entry(0).clear_flags(::memory::tables::EntryFlags::PRESENT);
+
+        proc::run_in_user_mode(prog.entry as usize, p1.stack);
     }
 
     // p1.switch_to();
@@ -166,9 +185,36 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     }
 }
 
+fn create_app_stack(entry: usize) -> usize {
+    let bottom = 0x7FFF0000usize;
+    let size = 4 * 1024;
+    let mut top = bottom + size;
+    unsafe { ::mem::memset(bottom, 0, size); }
+    top -= 128;
+
+    let mut arr = unsafe { &mut*(top as *mut [u64; 16]) };
+    arr[0] = 2; // argc
+    arr[1] = "/ld/ld.so.1\0".as_ptr() as u64;
+    arr[2] = "/bin/false\0".as_ptr() as u64;
+    arr[3] = 0;
+    arr[4] = 0; // env
+    arr[5] = 31; // AT_EXECFN
+    arr[6] = "/ld/ld.so.1\0".as_ptr() as u64;
+    arr[7] = 9; // AT_ENTRY
+    arr[8] = entry as u64;
+    arr[9] = 3; // AT_PHDR
+    arr[10] = 64;
+    arr[11] = 0;
+    arr[12] = 0;
+
+
+    top
+}
+
 extern "C" {
     static __hello_start: u8;
     static __hello_end: u8;
+    static __ld_start: u8;
 }
 
 extern "C" fn process_handler1() {
@@ -349,7 +395,8 @@ fn thread_starter() {
     unsafe {
         println!("Thread starter");
         let current_proc = ::proc::PROCESS_MANAGER.current_proc();
-        proc::run_in_user_mode(process_handler2 as *const u8 as usize, current_proc.stack);
+        panic!("need to start process");
+        // proc::run_in_user_mode(process_handler2 as *const u8 as usize, current_proc.stack);
     }
 }
 
