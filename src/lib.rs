@@ -159,7 +159,7 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
 
         // let prog = elf::ElfHeader::load(&__hello_start as *const _ as usize);
         let prog = elf::ElfHeader::load(&__ld_start as *const _ as usize);
-        p1.stack = create_app_stack(prog.entry as usize);
+        p1.stack = create_app_stack(prog.entry as usize, &prog);
         prog.load_to_memory();
 
         interrupts::enabled = false;
@@ -185,36 +185,47 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     }
 }
 
-fn create_app_stack(entry: usize) -> usize {
-    let bottom = 0x7FFF0000usize;
-    let size = 4 * 1024;
-    let mut top = bottom + size;
+fn create_app_stack(entry: usize, elf_header: &::elf::ElfHeader) -> usize {
+    let top = 0x80000000usize;
+    let size = 16 * 1024;
+    let bottom = top - size;
     unsafe { ::mem::memset(bottom, 0, size); }
-    top -= 128;
 
-    let mut arr = unsafe { &mut*(top as *mut [u64; 16]) };
-    arr[0] = 2; // argc
-    arr[1] = "/ld/ld.so.1\0".as_ptr() as u64;
-    arr[2] = "/bin/false\0".as_ptr() as u64;
-    arr[3] = 0;
-    arr[4] = 0; // env
-    arr[5] = 31; // AT_EXECFN
-    arr[6] = "/ld/ld.so.1\0".as_ptr() as u64;
-    arr[7] = 9; // AT_ENTRY
-    arr[8] = entry as u64;
-    arr[9] = 3; // AT_PHDR
-    arr[10] = 64;
-    arr[11] = 0;
-    arr[12] = 0;
+    let mut stack = ::elf::ElfStack::new(top, size);
+    stack.write(elf_header);
+
+    stack.top
+
+    // let mut top = bottom + size;
+
+    // top -= 128;
+
+    // let mut arr = unsafe { &mut*(top as *mut [u64; 16]) };
+    // arr[0] = 2; // argc
+    // arr[1] = "/ld/ld.so.1\0".as_ptr() as u64;
+    // arr[2] = "/bin/false\0".as_ptr() as u64;
+    // arr[3] = 0;
+    // arr[4] = 0; // env
+    // arr[5] = 31; // AT_EXECFN
+    // arr[6] = "/ld/ld.so.1\0".as_ptr() as u64;
+    // arr[7] = 9; // AT_ENTRY
+    // arr[8] = entry as u64;
+    // arr[9] = 3; // AT_PHDR
+    // arr[10] = 64;
+    // arr[11] = 0;
+    // arr[12] = 0;
 
 
-    top
+    // top
 }
 
 extern "C" {
-    static __hello_start: u8;
-    static __hello_end: u8;
-    static __ld_start: u8;
+    pub static __hello_start: u8;
+    pub static __hello_end: u8;
+    pub static __ld_start: u8;
+    pub static __ld_end: u8;
+    pub static __busybox_start: u8;
+    pub static __busybox_end: u8;
 }
 
 extern "C" fn process_handler1() {

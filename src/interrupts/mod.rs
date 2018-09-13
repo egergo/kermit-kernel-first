@@ -185,12 +185,56 @@ impl Pollfd {
     }
 }
 
+static mut POS: usize = 0;
+
 fn handle_syscall(vars: &mut InteruptStack) {
     let syscall_number = vars.rax;
     // println!("Sys");
 
     // http://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
     match syscall_number {
+        0 => {
+            println!("Syscall: read fd={:x} buf={:x} count={:x}", vars.rdi, vars.rsi, vars.rdx);
+            let count = vars.rdx as usize;
+            let buf = vars.rsi as usize;
+
+            unsafe {
+                let mut to_read = &::__busybox_end as *const _ as usize - POS;
+                if to_read > count {
+                    to_read = count;
+                }
+
+                ::mem::memcpy(buf, POS, to_read);
+                POS += to_read;
+                vars.rax = to_read as u64;
+            }
+
+            // vars.rax = 0;
+        }
+        1 => {
+            let fd = vars.rdi;
+            let buf = vars.rsi as usize;
+            let count = vars.rdx as usize;
+            println!("Syscall: write fd={:x} buf={:x} count={:x}", fd, buf, count);
+
+            unsafe {
+                let sl = core::slice::from_raw_parts(buf as *const u8, count);
+                let s = core::str::from_utf8_unchecked(sl);
+                println!("-> {}", s);
+            }
+            vars.rax = count as u64;
+        }
+        2 => {
+            println!("Syscall: open pathname={:x} flags={:x} mode={:x}", vars.rdi, vars.rsi, vars.rdx);
+            unsafe {
+                POS = &::__busybox_start as *const _ as usize;
+            }
+            vars.rax = 3;
+        }
+        3 => {
+            println!("Syscall: close fd={:x}", vars.rdi);
+            vars.rax = 0;
+        }
         7 => {
             println!("Syscall: poll fds={:x} nfds={:x} timeout={:x}", vars.rdi, vars.rsi, vars.rdx);
             unsafe {
@@ -200,6 +244,70 @@ fn handle_syscall(vars: &mut InteruptStack) {
             panic!();
             vars.rax = 0;
         },
+        9 => {
+            let prot = ProtFlags::from_bits(vars.rdx as i32).expect("unknown prot flags");
+            let flags = MapFlags::from_bits(vars.r10 as i32).expect("unknown mmap flags");
+            let fd = vars.r8;
+            let offset = vars.r9 as usize;
+            let mut addr = vars.rdi as usize;
+            let length = vars.rsi as usize;
+            println!("Syscall: mmap addr={:x} length={:x} prot={:?} flags={:?} fd={} offset={:x}", addr, length, prot, flags, fd, offset);
+
+            if addr == 0 {
+                addr = 0x60000000;
+            }
+            vars.rax = addr as u64;
+
+            unsafe {
+                enabled = true;
+                ::mem::memset(addr, 0, length);
+
+                let mut start = &::__busybox_start as *const _ as usize;
+                let mut file_length = (&::__busybox_end as *const _ as usize) - start;
+
+                if offset > file_length {
+                    panic!("Invalid offset")
+                    // TODO: just return
+                }
+
+                start += offset;
+                file_length -= offset;
+
+                if length < file_length {
+                    file_length = length;
+                }
+
+                ::mem::memcpy(addr, start, file_length);
+                enabled = false;
+            }
+        }
+        10 => {
+            let prot = ProtFlags::from_bits(vars.rdx as i32).expect("unknown prot flags");
+            println!("Syscall: mprotect addr={:x} len={:x} prot={:?}", vars.rdi, vars.rsi, prot);
+            vars.rax = 0;
+        }
+        14 => {
+            println!("Syscall: sigprocmask how={:x} set={:x} oldset={:x}", vars.rdi, vars.rsi, vars.rdx);
+
+            // SIG_BLOCK: 0
+            // SIG_UNBLOCK: 1
+            // SIG_SETMASK: 2
+            // TODO: handle signals
+            unsafe {
+                if vars.rsi != 0 {
+                    let set = *(vars.rsi as *const u32);
+                    println!("Set: {:x}", set);
+                }
+            }
+
+            unsafe {
+                if vars.rdi != 0 {
+                    *(vars.rdi as *mut u32) = 0;
+                }
+            }
+
+            vars.rax = 0;
+        }
         16 => {
             println!("Syscall: ioctl fd={:x} request={:x} ptr={:x}", vars.rdi, vars.rsi, vars.rdx);
             match vars.rsi {
@@ -226,6 +334,22 @@ fn handle_syscall(vars: &mut InteruptStack) {
             }
             vars.rax = bytes_written as u64;
         },
+        102 => {
+            println!("Syscall: getuid");
+            vars.rax = 0; // TODO: 0 causes exit(1)
+        }
+        104 => {
+            println!("Syscall: getgid");
+            vars.rax = 0; // TODO: 0 causes exit(1)
+        }
+        105 => {
+            println!("Syscall: setuid uid={}", vars.rdi);
+            vars.rax = 0;
+        }
+        106 => {
+            println!("Syscall: setgid gid={}", vars.rdi);
+            vars.rax = 0;
+        }
         158 => {
             // %rdi, %rsi, %rdx, %r10, %r8 and %r9
             println!("Syscall: arch_prctl code={:x} addr={:x}", vars.rdi, vars.rsi);
@@ -239,20 +363,32 @@ fn handle_syscall(vars: &mut InteruptStack) {
             }
             vars.rax = 0;
         },
+        202 => {
+            let addr = vars.rdi as usize;
+            let futex_word = unsafe { *(addr as *const u32) };
+            let op = vars.rsi;
+            println!("Syscall: futex op={:x} addr={:x} futex_word={:x}", op, addr, futex_word);
+
+            vars.rax = 2; // on FUTEX_WAKE
+        }
         218 => { //
             println!("Syscall: set_tid_address tidptr={:x}", vars.rdi);
             unsafe {
                 let mut asdf = vars.rdi as *mut usize;
-                *asdf = 0usize;
+                let val = *asdf;
+                println!("TID: {:x}", val);
+                // *asdf = 1usize;
             }
-            vars.rax = 1; // thread id
+            vars.rax = 20; // thread id
         },
         231 => {
             println!("Syscall: exit_group code={:x}", vars.rdi);
-            loop {};
+            unsafe {
+                asm!("hlt");
+            }
         }
         x => {
-            println!("Syscall rax={} 1={:x} 2={:x} 3={:x}", syscall_number, vars.rdi, vars.rsi, vars.rdx);
+            println!("Syscall rax={} 1={:x} 2={:x} 3={:x} 4={:x} 5={:x} 6={:x}", syscall_number, vars.rdi, vars.rsi, vars.rdx, vars.r10, vars.r8, vars.r9);
             panic!("Unhandled syscall {:x}", x);
         }
     }
@@ -304,4 +440,27 @@ fn handle_fast_syscall() -> ! {
         " :::: "intel", "volatile");
     }
     unreachable!();
+}
+
+bitflags! {
+    pub struct ProtFlags: i32 {
+        const PROT_NONE = 0x00;
+        const PROT_READ = 0x01;
+        const PROT_WRITE = 0x02;
+        const PROT_EXEC = 0x04;
+    }
+}
+
+bitflags! {
+    pub struct MapFlags: i32 {
+        const MAP_SHARED = 0x01;
+        const MAP_PRIVATE = 0x02;
+        const MAP_SHARED_VALIDATE = 0x03;
+        const MAP_FIXED = 0x10;
+        const MAP_ANONYMOUS = 0x20;
+        const MAP_HUGETLB = 0x40000;
+        const MAP_UNINITIALIZED = 0x4000000;
+        const MAP_FIXED_NOREPLACE = 0x100000;
+        const MAP_NORESERVE = 0x4000;
+    }
 }
