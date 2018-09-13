@@ -108,13 +108,14 @@ set_up_page_tables:
     or eax, 0b111 ; user access + present + writable
     mov [p4_table + 511 * 8], eax
 
-    mov eax, 0b10000111 ; present + writable + huge
-    mov [p3_511_table + 510 * 8], eax
+    ; mov eax, 0b10000111 ; present + writable + huge
+    ; mov [p3_511_table + 510 * 8], eax
 
 	; map first P3 entry to P2 table
 	mov eax, p2_table
 	or eax, 0b111 ; present + writable
 	mov [p3_table], eax
+    mov [p3_511_table + 510 * 8], eax
 
 	; TODO map each P2 entry to a huge 2MiB page
 	mov ecx, 0         ; counter variable
