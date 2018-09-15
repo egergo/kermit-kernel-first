@@ -180,6 +180,8 @@ impl ElfStack {
         self.env_count += 1;
         self.envs[self.env_count] = self.write_str("USER=root");
         self.env_count += 1;
+        // self.envs[self.env_count] = self.write_str("LD_BIND_NOW=1");
+        // self.env_count += 1;
     }
 
     fn write_env_table(&mut self) {
@@ -193,10 +195,11 @@ impl ElfStack {
     fn write_arg_strings(&mut self) {
         self.args[self.arg_count] = self.write_str("/ld/ld.so.1");
         self.arg_count += 1;
-        self.args[self.arg_count] = self.write_str("/bin/echo");
+        // TODO: sleep dies
+        self.args[self.arg_count] = self.write_str("/bin/sh");
         self.arg_count += 1;
-        self.args[self.arg_count] = self.write_str("Hello World");
-        self.arg_count += 1;
+        // self.args[self.arg_count] = self.write_str("1");
+        // self.arg_count += 1;
     }
 
     fn write_arg_table(&mut self) {

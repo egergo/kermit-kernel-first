@@ -185,6 +185,17 @@ impl Pollfd {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+struct Utsname {
+	pub sysname: [u8; 9],
+	pub nodename: [u8; 9],
+	pub release: [u8; 9],
+	pub version: [u8; 9],
+	pub machine: [u8; 9]
+}
+
+
 static mut POS: usize = 0;
 
 fn handle_syscall(vars: &mut InteruptStack) {
@@ -225,11 +236,18 @@ fn handle_syscall(vars: &mut InteruptStack) {
             vars.rax = count as u64;
         }
         2 => {
-            println!("Syscall: open pathname={:x} flags={:x} mode={:x}", vars.rdi, vars.rsi, vars.rdx);
-            unsafe {
-                POS = &::__busybox_start as *const _ as usize;
+            let pathname_ptr = vars.rdi as usize;
+            let pathname = unsafe { ::mem::c_to_str(pathname_ptr) };
+            println!("Syscall: open pathname={} flags={:x} mode={:x}", pathname, vars.rsi, vars.rdx);
+
+            if pathname == "/dev/tty" {
+                vars.rax = 0xFFFFFFFF_FFFFFFFF;
+            } else {
+                unsafe {
+                    POS = &::__busybox_start as *const _ as usize;
+                }
+                vars.rax = 3;
             }
-            vars.rax = 3;
         }
         3 => {
             println!("Syscall: close fd={:x}", vars.rdi);
@@ -286,6 +304,25 @@ fn handle_syscall(vars: &mut InteruptStack) {
             println!("Syscall: mprotect addr={:x} len={:x} prot={:?}", vars.rdi, vars.rsi, prot);
             vars.rax = 0;
         }
+        12 => {
+            let addr = vars.rdi as usize;
+            println!("Syscall: brk addr={:x}", addr);
+            if addr == 0 {
+                vars.rax = 0x10000000;
+            } else {
+                unsafe { enabled = true; }
+                vars.rax = addr as u64;
+            }
+        }
+        13 => {
+            let sig = vars.rdi as usize;
+            let act = vars.rsi as usize;
+            let oact = vars.rdx as usize;
+            let sigsetsize = vars.r10 as usize;
+            println!("Syscall: rt_sigaction sig={:x} act={:x} oact={:x} sigsetsize={:x}", sig, act, oact, sigsetsize);
+            vars.rax = 0;
+            // TODO: implement signals
+        }
         14 => {
             println!("Syscall: sigprocmask how={:x} set={:x} oldset={:x}", vars.rdi, vars.rsi, vars.rdx);
 
@@ -334,6 +371,28 @@ fn handle_syscall(vars: &mut InteruptStack) {
             }
             vars.rax = bytes_written as u64;
         },
+        27 => {
+            let addr = vars.rdi as usize;
+            let length = vars.rsi as usize;
+            let vec = vars.rdx as usize;
+            println!("Syscall: writev addr={:x} length={:x} vex={:x}", addr, length, vec);
+            vars.rax = 0;
+        }
+        39 => {
+            println!("Syscall: getpid");
+            vars.rax = 1;
+        }
+        63 => {
+            println!("Syscall: uname name={:x}", vars.rdi);
+            vars.rax = 0;
+        }
+        79 => {
+            let buf = vars.rdi as usize;
+            let size = vars.rsi as usize;
+            println!("Syscall: getcwd buf={:x} size={:x}", buf, size);
+            ::mem::copy_str_safe(buf, "/", size);
+            vars.rax = buf as u64;
+        }
         102 => {
             println!("Syscall: getuid");
             vars.rax = 0; // TODO: 0 causes exit(1)
@@ -348,6 +407,10 @@ fn handle_syscall(vars: &mut InteruptStack) {
         }
         106 => {
             println!("Syscall: setgid gid={}", vars.rdi);
+            vars.rax = 0;
+        }
+        110 => {
+            println!("Syscall: getppid");
             vars.rax = 0;
         }
         158 => {
