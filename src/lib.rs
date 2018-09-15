@@ -12,6 +12,9 @@
 #![feature(const_raw_ptr_to_usize_cast)]
 #![feature(const_let)]
 #![feature(asm)]
+#![feature(alloc)]
+#![feature(allocator_api)]
+#![feature(alloc_error_handler)]
 
 #![no_std]
 
@@ -22,6 +25,7 @@ extern crate multiboot2;
 extern crate x86_64;
 #[macro_use]
 extern crate bitflags;
+extern crate alloc;
 
 #[macro_use]
 mod console;
@@ -40,6 +44,8 @@ pub mod memory;
 
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{ExceptionStackFrame, InterruptDescriptorTable};
+// use alloc::alloc::{GlobalAlloc, Layout, AllocErr};
+use core::alloc::{GlobalAlloc, Layout};
 
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
@@ -132,6 +138,10 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     // // trigger a stack overflow
     // stack_overflow();
 
+    {
+        let _a = alloc::boxed::Box::new(1);
+    }
+
     println!("Detecting memory...");
     let mbi = multiboot::get();
     let mm = mbi.memory_map_tag().expect("Memory map not provided by GRUB");
@@ -164,7 +174,7 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
 
         interrupts::enabled = false;
 
-        let t = &mut ::memory::tables::PROC_TABLE;
+        let _t = &mut ::memory::tables::PROC_TABLE;
         // t.create_or_get_entry(0).clear_flags(::memory::tables::EntryFlags::PRESENT);
 
         proc::run_in_user_mode(prog.entry as usize, p1.stack);
@@ -185,11 +195,11 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     }
 }
 
-fn create_app_stack(entry: usize, elf_header: &::elf::ElfHeader) -> usize {
+fn create_app_stack(_entry: usize, elf_header: &::elf::ElfHeader) -> usize {
     let top = 0x80000000usize;
     let size = 16 * 1024;
     let bottom = top - size;
-    unsafe { ::mem::memset(bottom, 0, size); }
+    unsafe { mem::memset(bottom, 0, size); }
 
     let mut stack = ::elf::ElfStack::new(top, size);
     stack.write(elf_header);
@@ -228,94 +238,94 @@ extern "C" {
     pub static __busybox_end: u8;
 }
 
-extern "C" fn process_handler1() {
-    unsafe {
-        println!("Hello World from Process1 {:x} {:x}", &__hello_start as *const _ as usize, &__hello_end as *const _ as usize);
+// extern "C" fn process_handler1() {
+//     unsafe {
+//         println!("Hello World from Process1 {:x} {:x}", &__hello_start as *const _ as usize, &__hello_end as *const _ as usize);
 
-        let prog = elf::ElfHeader::load(&__hello_start as *const _ as usize);
-        // println!("Hello World from Process1 {:?}", prog);
-        // println!("Hello World from Process1 {:?}", prog.program_header());
-        prog.load_to_memory();
+//         let prog = elf::ElfHeader::load(&__hello_start as *const _ as usize);
+//         // println!("Hello World from Process1 {:?}", prog);
+//         // println!("Hello World from Process1 {:?}", prog.program_header());
+//         prog.load_to_memory();
 
-        asm!("
-            push 0
-            push 0
-            push 0
-            push 0
-            push 0
-            push 0
-            push 0
-            push 0
-        " :::: "intel");
-        asm!("jmp $0" :: "r"(prog.entry) :: "intel");
-    }
-    let mut last_time = 0usize;
+//         asm!("
+//             push 0
+//             push 0
+//             push 0
+//             push 0
+//             push 0
+//             push 0
+//             push 0
+//             push 0
+//         " :::: "intel");
+//         asm!("jmp $0" :: "r"(prog.entry) :: "intel");
+//     }
+//     let mut last_time = 0usize;
 
-    unsafe {
-        asm!("
-            mov rax, 1337
-            int 80h
-        " : : : "rax" : "intel")
-    }
+//     unsafe {
+//         asm!("
+//             mov rax, 1337
+//             int 80h
+//         " : : : "rax" : "intel")
+//     }
 
-    unsafe {
-        asm!("
-            mov rax, 1337
-            syscall
-        " : : : "rax" : "intel")
-    }
+//     unsafe {
+//         asm!("
+//             mov rax, 1337
+//             syscall
+//         " : : : "rax" : "intel")
+//     }
 
-    unsafe {
-        let rax: u64;
+//     unsafe {
+//         let rax: u64;
 
-        asm!("mov $0, rax" : "=r"(rax) ::: "intel");
-            // mov $1,rbx, 667
-            // mov rcx, 668
-            // mov rdx, 669
-            // mov rsi, 670
-            // mov rdi, 671
-            // mov rbp, 672
-            // mov r9, 709
-            // mov r10, 710
-            // mov r11, 711
-            // mov r12, 712
-            // mov r13, 713
-            // mov r14, 714
-            // mov r15, 715
-        println!("RAX: {}", rax);
-    }
+//         asm!("mov $0, rax" : "=r"(rax) ::: "intel");
+//             // mov $1,rbx, 667
+//             // mov rcx, 668
+//             // mov rdx, 669
+//             // mov rsi, 670
+//             // mov rdi, 671
+//             // mov rbp, 672
+//             // mov r9, 709
+//             // mov r10, 710
+//             // mov r11, 711
+//             // mov r12, 712
+//             // mov r13, 713
+//             // mov r14, 714
+//             // mov r15, 715
+//         println!("RAX: {}", rax);
+//     }
 
 
 
-    println!("After int80");
-    loop {
-        let my_rsp = get_rsp();
-        let current_time = ::apic::TIME.load(core::sync::atomic::Ordering::SeqCst);
-        if current_time / 1_000_000_000 != last_time / 1_000_000_000 {
-        // if current_time != last_time {
-            last_time = current_time;
-            unsafe {
-                println!("Time1: {} -> ss: {:x}, rsp: {:x} -> ss: {:x}, rsp: {:x}", last_time / 1_000_000, my_rsp.0, my_rsp.1, KERNEL_RSP.0, KERNEL_RSP.1);
-            }
-        }
-    }
-}
+//     println!("After int80");
+//     loop {
+//         let my_rsp = get_rsp();
+//         let current_time = ::apic::TIME.load(core::sync::atomic::Ordering::SeqCst);
+//         if current_time / 1_000_000_000 != last_time / 1_000_000_000 {
+//         // if current_time != last_time {
+//             last_time = current_time;
+//             unsafe {
+//                 println!("Time1: {} -> ss: {:x}, rsp: {:x} -> ss: {:x}, rsp: {:x}", last_time / 1_000_000, my_rsp.0, my_rsp.1, KERNEL_RSP.0, KERNEL_RSP.1);
+//             }
+//         }
+//     }
+// }
 
-extern "C" fn process_handler2() {
-    println!("Hello World from Process2");
-    let mut last_time = 0usize;
-    loop {
-        let my_rsp = get_rsp();
-        let current_time = ::apic::TIME.load(core::sync::atomic::Ordering::SeqCst);
-        if current_time / 1_000_000_000 != last_time / 1_000_000_000 {
-        // if current_time != last_time {
-            last_time = current_time;
-            unsafe {
-                println!("Time2: {} -> ss: {:x}, rsp: {:x} -> ss: {:x}, rsp: {:x}", last_time / 1_000_000, my_rsp.0, my_rsp.1, KERNEL_RSP.0, KERNEL_RSP.1);
-            }
-        }
-    }
-}
+// extern "C" fn process_handler2() {
+//     println!("Hello World from Process2");
+//     let mut last_time = 0usize;
+//     loop {
+//         let my_rsp = get_rsp();
+//         let current_time = ::apic::TIME.load(core::sync::atomic::Ordering::SeqCst);
+//         if current_time / 1_000_000_000 != last_time / 1_000_000_000 {
+//         // if current_time != last_time {
+//             last_time = current_time;
+//             unsafe {
+//                 println!("Time2: {} -> ss: {:x}, rsp: {:x} -> ss: {:x}, rsp: {:x}", last_time / 1_000_000, my_rsp.0, my_rsp.1, KERNEL_RSP.0, KERNEL_RSP.1);
+//             }
+//         }
+//     }
+// }
 
 pub static mut KERNEL_RSP: (u16, usize) = (0, 0);
 
@@ -405,7 +415,7 @@ extern "x86-interrupt" fn handle_syscall(_stack_frame: &mut ExceptionStackFrame)
 fn thread_starter() {
     unsafe {
         println!("Thread starter");
-        let current_proc = ::proc::PROCESS_MANAGER.current_proc();
+        let _current_proc = ::proc::PROCESS_MANAGER.current_proc();
         panic!("need to start process");
         // proc::run_in_user_mode(process_handler2 as *const u8 as usize, current_proc.stack);
     }
@@ -428,3 +438,30 @@ pub fn panic(_info: &PanicInfo) -> ! {
 //     println!("    {}", fmt);
 //     loop{}
 // }
+
+
+
+struct MyAllocator;
+
+unsafe impl GlobalAlloc for MyAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        println!("alloc: {:?}", layout);
+        // System.alloc(layout)
+        ::mem::malloc(layout.size() as u64) as *mut u8
+        // 0 as *mut u8
+        // Error(AllocErr{})
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        println!("dealloc: {:x} {:?}", ptr as usize, layout);
+        // System.dealloc(ptr, layout)
+    }
+}
+
+#[global_allocator]
+static GLOBAL: MyAllocator = MyAllocator;
+
+#[alloc_error_handler]
+fn foo(_: core::alloc::Layout) -> ! {
+    panic!("alloc");
+}

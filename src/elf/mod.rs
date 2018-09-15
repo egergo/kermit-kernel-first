@@ -186,7 +186,7 @@ impl ElfStack {
 
     fn write_env_table(&mut self) {
         for i in 0..self.env_count {
-            let tmp = self.envs[0];
+            let tmp = self.envs[i];
             self.write_usize(tmp);
         }
         self.write_usize(0);

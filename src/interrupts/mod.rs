@@ -260,7 +260,7 @@ fn handle_syscall(vars: &mut InteruptStack) {
                 println!("FDS: {:?}", polls)
             }
             panic!();
-            vars.rax = 0;
+            // vars.rax = 0;
         },
         9 => {
             let prot = ProtFlags::from_bits(vars.rdx as i32).expect("unknown prot flags");

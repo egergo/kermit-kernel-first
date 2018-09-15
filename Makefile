@@ -58,4 +58,4 @@ target/blobs/busybox.o: blobs/busybox.asm blobs/busybox
 	@nasm -felf64 $< -o $@
 
 $(KERNEL): $(LINKER_SCRIPT) $(BOOTLOADER_OBJ) $(LIBKERNEL) target/blobs/hello.o target/blobs/ld.o target/blobs/busybox.o
-	@ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) target/blobs/hello.o target/blobs/ld.o target/blobs/busybox.o --start-group $(LIBKERNEL) -lacpica -lgcc --end-group
+	ld -static $(LIBPATH) -nmagic -T $(LINKER_SCRIPT) -o $(KERNEL) $(BOOTLOADER_OBJ) target/blobs/hello.o target/blobs/ld.o target/blobs/busybox.o --start-group $(LIBKERNEL) -lgcc -lacpica --end-group

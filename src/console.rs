@@ -105,7 +105,7 @@ impl Writer {
             use x86_64::instructions::port::Port;
 
             let mut plus0 = Port::<u8>::new(0x3F8);
-            let mut plus5 = Port::<u8>::new(0x3F8 + 5);
+            let plus5 = Port::<u8>::new(0x3F8 + 5);
 
             loop {
                 if plus5.read() & 0x20 != 0 {
