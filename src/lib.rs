@@ -41,6 +41,8 @@ pub mod proc;
 pub mod interrupts;
 pub mod elf;
 pub mod memory;
+pub mod syscalls;
+pub mod utils;
 
 use core::panic::PanicInfo;
 use x86_64::structures::idt::{ExceptionStackFrame, InterruptDescriptorTable};
@@ -114,6 +116,9 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
     gdt::init();
     println!("Setting up IDT...");
     interrupts::init();
+    syscalls::init();
+
+    // interrupts::init();
     // println!("int3...");
     x86_64::instructions::int3();
 
@@ -172,7 +177,7 @@ pub extern "C" fn _start(multiboot_information_address: usize) -> ! {
         p1.stack = create_app_stack(prog.entry as usize, &prog);
         prog.load_to_memory();
 
-        interrupts::enabled = false;
+        // interrupts::enabled = false;
 
         let _t = &mut ::memory::tables::PROC_TABLE;
         // t.create_or_get_entry(0).clear_flags(::memory::tables::EntryFlags::PRESENT);

@@ -29,18 +29,9 @@ impl PageTable {
     pub const fn new() -> Self {
         PageTable([PageTableEntry::new(); 512])
     }
-    pub fn address_to_tables(addr: u64) -> (usize, usize, usize, usize, usize) {
-        (
-            ((addr >> (9 + 9 + 9 + 12)) & 0b1_1111_1111) as usize,
-            ((addr >> (9 + 9 + 12)) & 0b1_1111_1111) as usize,
-            ((addr >> (9 + 12)) & 0b1_1111_1111) as usize,
-            ((addr >> 12) & 0b1_1111_1111) as usize,
-            (addr & 0b1111_1111_1111) as usize,
-        )
-    }
 
     pub fn create_or_get_entry(&mut self, addr: usize) -> &mut PageTableEntry {
-        let pages = Self::address_to_tables(addr as u64);
+        let pages = address_to_tables(addr as u64);
 
         let table4 = self;
         let table3 = {
@@ -75,6 +66,16 @@ impl PageTable {
 
         &mut table1.0[pages.3]
     }
+}
+
+pub fn address_to_tables(addr: u64) -> (usize, usize, usize, usize, usize) {
+    (
+        ((addr >> (9 + 9 + 9 + 12)) & 0b1_1111_1111) as usize,
+        ((addr >> (9 + 9 + 12)) & 0b1_1111_1111) as usize,
+        ((addr >> (9 + 12)) & 0b1_1111_1111) as usize,
+        ((addr >> 12) & 0b1_1111_1111) as usize,
+        (addr & 0b1111_1111_1111) as usize,
+    )
 }
 
 impl PageTableEntry {
